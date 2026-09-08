@@ -1,0 +1,16 @@
+name = "tifton-golive-tracker"
+pages_build_output_dir = "public"
+compatibility_date = "2026-09-08"
+
+# SITE_PASSWORD and SESSION_SECRET are intentionally NOT declared here.
+#
+# Set them instead via the Cloudflare dashboard: your Pages project ->
+# Settings -> Environment variables -> Add variable -> toggle "Encrypt".
+# Once set this way, they persist automatically across every future
+# deployment — Cloudflare will not remove them on its own. They do not
+# need, and currently cannot cleanly use, a wrangler.toml entry the way
+# plain bindings (KV, D1, R2, [vars], etc.) do.
+#
+# Putting the actual secret VALUES in this file would also mean committing
+# your password and signing key to git — exactly what secrets are meant to
+# avoid. See README.md for the full walkthrough (browser only, no terminal).
