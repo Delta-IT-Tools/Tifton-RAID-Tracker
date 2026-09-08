@@ -58,7 +58,27 @@ export default {
     }
 
     // Authenticated — serve the static tracker (public/index.html, etc).
-    return env.ASSETS.fetch(request);
+    // The response's Content-Type header is what actually controls how the
+    // browser decodes the bytes — the <meta charset="UTF-8"> tag in the
+    // HTML is only advisory and gets overridden if the header specifies (or
+    // omits) a charset. Cloudflare's static asset serving doesn't reliably
+    // include "charset=utf-8" on its own, which is what caused em dashes
+    // and other multi-byte characters to render as garbled text (e.g. "—"
+    // showing up as "â€"") even though the underlying file bytes were
+    // always correct UTF-8. Forcing it here guarantees correct decoding
+    // regardless of what Cloudflare's default asset pipeline sends.
+    const assetResponse = await env.ASSETS.fetch(request);
+    const contentType = assetResponse.headers.get("Content-Type") || "";
+    if (contentType.startsWith("text/html")) {
+      const headers = new Headers(assetResponse.headers);
+      headers.set("Content-Type", "text/html; charset=utf-8");
+      return new Response(assetResponse.body, {
+        status: assetResponse.status,
+        statusText: assetResponse.statusText,
+        headers,
+      });
+    }
+    return assetResponse;
   },
 };
 
@@ -120,12 +140,7 @@ async function handleLoginPost(request, env) {
   const expectedPassword = sitePassword.trim();
 
   if (!timingSafeEqual(password, expectedPassword)) {
-    // TEMPORARY diagnostic: shows character COUNTS only, never the actual
-    // password value, to pin down whether this is a hidden-character/
-    // length mismatch vs. a genuinely different stored value. Remove this
-    // debugInfo line once login is confirmed working.
-    const debugInfo = `(you typed ${password.length} character${password.length === 1 ? '' : 's'}; the stored password is ${expectedPassword.length} character${expectedPassword.length === 1 ? '' : 's'})`;
-    return renderLoginPage(true, debugInfo);
+    return renderLoginPage(true);
   }
 
   const expiry = Date.now() + SESSION_DURATION_MS;
@@ -186,7 +201,7 @@ function timingSafeEqual(a, b) {
   return result === 0;
 }
 
-function renderLoginPage(showError, debugInfo) {
+function renderLoginPage(showError) {
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -234,7 +249,7 @@ function renderLoginPage(showError, debugInfo) {
   <div class="card">
     <div class="title">TIFTON Go-Live Tracker</div>
     <div class="subtitle">Enter the password to continue</div>
-    ${showError ? `<div class="error">Incorrect password — please try again.${debugInfo ? `<br><span style="opacity:0.75;">${debugInfo}</span>` : ''}</div>` : ""}
+    ${showError ? '<div class="error">Incorrect password — please try again.</div>' : ""}
     <form method="POST" action="/login">
       <label for="password">Password</label>
       <input type="password" id="password" name="password" placeholder="••••••••" autofocus required>
