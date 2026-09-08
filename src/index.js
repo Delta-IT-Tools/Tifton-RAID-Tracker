@@ -64,8 +64,23 @@ export default {
 
 // ---------- Auth (same logic as the original _middleware.js) ----------
 
+// Resolves a secret regardless of whether this account's dashboard bound
+// it as a plain string (the traditional "Encrypted" Worker secret) or as
+// a Secrets Store binding (a newer, separate Cloudflare product that
+// returns an RPC object with an async .get() method instead of a plain
+// string). Calling .trim() or .length directly on a Secrets Store binding
+// silently produces garbage instead of throwing, which is what caused the
+// "[object JsRpcProperty]" — this normalizes both shapes to a real string.
+async function resolveSecret(value) {
+  if (typeof value === "string") return value;
+  if (value && typeof value.get === "function") return await value.get();
+  return "";
+}
+
 async function isAuthenticated(request, env) {
-  if (!env.SITE_PASSWORD || !env.SESSION_SECRET) {
+  const sitePassword = await resolveSecret(env.SITE_PASSWORD);
+  const sessionSecret = await resolveSecret(env.SESSION_SECRET);
+  if (!sitePassword || !sessionSecret) {
     // Secrets not configured yet — fail closed (show login) rather than
     // silently letting everyone through.
     return false;
@@ -77,7 +92,7 @@ async function isAuthenticated(request, env) {
   if (parts.length !== 2) return false;
   const [expiryStr, sig] = parts;
 
-  const expected = await hmac(env.SESSION_SECRET, expiryStr);
+  const expected = await hmac(sessionSecret, expiryStr);
   if (!timingSafeEqual(sig, expected)) return false;
 
   const expiry = parseInt(expiryStr, 10);
@@ -87,7 +102,9 @@ async function isAuthenticated(request, env) {
 }
 
 async function handleLoginPost(request, env) {
-  if (!env.SITE_PASSWORD || !env.SESSION_SECRET) {
+  const sitePassword = await resolveSecret(env.SITE_PASSWORD);
+  const sessionSecret = await resolveSecret(env.SESSION_SECRET);
+  if (!sitePassword || !sessionSecret) {
     return new Response(
       "Server is missing SITE_PASSWORD / SESSION_SECRET. Set them in this Worker's Settings → Variables and Secrets.",
       { status: 500 }
@@ -100,7 +117,7 @@ async function handleLoginPost(request, env) {
   // the Cloudflare dashboard's Variables and Secrets field — that would
   // otherwise make a visually-identical password silently never match.
   const password = (formData.get("password") || "").trim();
-  const expectedPassword = env.SITE_PASSWORD.trim();
+  const expectedPassword = sitePassword.trim();
 
   if (!timingSafeEqual(password, expectedPassword)) {
     // TEMPORARY diagnostic: shows character COUNTS only, never the actual
@@ -112,7 +129,7 @@ async function handleLoginPost(request, env) {
   }
 
   const expiry = Date.now() + SESSION_DURATION_MS;
-  const sig = await hmac(env.SESSION_SECRET, String(expiry));
+  const sig = await hmac(sessionSecret, String(expiry));
   const token = `${expiry}.${sig}`;
 
   const headers = new Headers();
