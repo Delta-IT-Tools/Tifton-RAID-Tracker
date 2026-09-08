@@ -1,0 +1,29 @@
+name = "tifton-raid-tracker"
+main = "src/index.js"
+compatibility_date = "2026-09-08"
+
+# Serves public/index.html and any other static files in that folder.
+# The "ASSETS" name here matches env.ASSETS used in src/index.js.
+[assets]
+directory = "public"
+binding = "ASSETS"
+
+# D1 database binding — this is NOT sensitive (it's just an ID, like a
+# resource name), so it's safe to commit and belongs here. See README.md
+# for how to create the database and fill in the real database_id below
+# (all done via the Cloudflare dashboard — no CLI needed).
+[[d1_databases]]
+binding = "DB"
+database_name = "tifton-golive-tracker-db"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+
+# SITE_PASSWORD and SESSION_SECRET are intentionally NOT declared here.
+#
+# Set them instead via the Cloudflare dashboard: this Worker -> Settings
+# -> Variables and Secrets -> Add -> toggle "Encrypt". Once set this way,
+# they persist automatically across every future deployment — Cloudflare
+# will not remove them on its own.
+#
+# Putting the actual secret VALUES in this file would also mean committing
+# your password and signing key to git — exactly what secrets are meant to
+# avoid. See README.md for the full walkthrough (browser only, no terminal).
