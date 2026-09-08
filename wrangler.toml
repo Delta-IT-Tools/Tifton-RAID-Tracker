@@ -1,4 +1,4 @@
-name = "tifton-golive-tracker"
+name = "Tifton-RAID-Tracker"
 pages_build_output_dir = "public"
 compatibility_date = "2026-09-08"
 
@@ -9,7 +9,7 @@ compatibility_date = "2026-09-08"
 [[d1_databases]]
 binding = "DB"
 database_name = "tifton-golive-tracker-db"
-database_id = "32d6b303-e8ed-477d-8b40-43b485d9a337"
+database_id = ""
 
 # SITE_PASSWORD and SESSION_SECRET are intentionally NOT declared here.
 #
