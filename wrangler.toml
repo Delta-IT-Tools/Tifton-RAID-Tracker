@@ -4,9 +4,16 @@ compatibility_date = "2026-09-08"
 
 # Serves public/index.html and any other static files in that folder.
 # The "ASSETS" name here matches env.ASSETS used in src/index.js.
+#
+# run_worker_first = true is essential here, not optional: by default
+# Cloudflare serves a matching static file directly and skips the Worker
+# entirely, which would mean the password gate never runs for the main
+# page. This forces every request through src/index.js first, so the
+# auth check always happens before any static file is served.
 [assets]
 directory = "public"
 binding = "ASSETS"
+run_worker_first = true
 
 # D1 database binding — this is NOT sensitive (it's just an ID, like a
 # resource name), so it's safe to commit and belongs here. See README.md
