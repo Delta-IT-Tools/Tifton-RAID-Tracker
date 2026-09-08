@@ -103,7 +103,12 @@ async function handleLoginPost(request, env) {
   const expectedPassword = env.SITE_PASSWORD.trim();
 
   if (!timingSafeEqual(password, expectedPassword)) {
-    return renderLoginPage(true);
+    // TEMPORARY diagnostic: shows character COUNTS only, never the actual
+    // password value, to pin down whether this is a hidden-character/
+    // length mismatch vs. a genuinely different stored value. Remove this
+    // debugInfo line once login is confirmed working.
+    const debugInfo = `(you typed ${password.length} character${password.length === 1 ? '' : 's'}; the stored password is ${expectedPassword.length} character${expectedPassword.length === 1 ? '' : 's'})`;
+    return renderLoginPage(true, debugInfo);
   }
 
   const expiry = Date.now() + SESSION_DURATION_MS;
@@ -164,7 +169,7 @@ function timingSafeEqual(a, b) {
   return result === 0;
 }
 
-function renderLoginPage(showError) {
+function renderLoginPage(showError, debugInfo) {
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -212,7 +217,7 @@ function renderLoginPage(showError) {
   <div class="card">
     <div class="title">TIFTON Go-Live Tracker</div>
     <div class="subtitle">Enter the password to continue</div>
-    ${showError ? '<div class="error">Incorrect password — please try again.</div>' : ""}
+    ${showError ? `<div class="error">Incorrect password — please try again.${debugInfo ? `<br><span style="opacity:0.75;">${debugInfo}</span>` : ''}</div>` : ""}
     <form method="POST" action="/login">
       <label for="password">Password</label>
       <input type="password" id="password" name="password" placeholder="••••••••" autofocus required>
