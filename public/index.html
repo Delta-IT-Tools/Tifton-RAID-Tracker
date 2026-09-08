@@ -198,6 +198,63 @@
   #tifton-tracker .logout-row { text-align: center; padding: 0 24px 16px; }
   #tifton-tracker .logout-link { font-size: 11.5px; color: rgba(243,241,234,0.55); text-decoration: none; }
   #tifton-tracker .logout-link:hover { text-decoration: underline; color: rgba(243,241,234,0.85); }
+
+  /* Network diagram */
+  #tifton-tracker .network-fab {
+    position: fixed;
+    bottom: 16px;
+    right: 20px;
+    z-index: 400;
+    background: rgba(51, 66, 73, 0.9);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.5);
+    border-radius: 20px;
+    padding: 7px 14px;
+    font-size: 12px;
+    font-family: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  #tifton-tracker .network-fab:hover { background: #334249; }
+  #tifton-tracker .diagram-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 26, 29, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 600;
+    padding: 20px;
+  }
+  #tifton-tracker .diagram-modal {
+    background: #fff;
+    border-radius: 14px;
+    padding: 20px;
+    max-width: 720px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  #tifton-tracker .diagram-modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  #tifton-tracker .diagram-modal-head h2 { font-size: 16px; font-weight: 700; margin: 0; color: var(--ink); font-family: 'Oswald', sans-serif; }
+  #tifton-tracker .diagram-close-btn {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: var(--paper);
+    color: var(--ink-soft);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 15px;
+    line-height: 1;
+  }
+  #tifton-tracker .diagram-close-btn:hover { background: var(--line); color: var(--ink); }
+  #tifton-tracker .diagram-visual {
+    background: linear-gradient(180deg, #9AC6E2 0%, #263138 100%);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  #tifton-tracker .diagram-caption { font-size: 13px; color: #fff; line-height: 1.5; margin-top: 12px; }
   #tifton-tracker .visually-hidden-input {
     position: absolute;
     width: 1px;
@@ -585,6 +642,7 @@
     <button class="btn-io" id="btn-import">Import JSON</button>
   </div>
   <div class="logout-row"><a href="/logout" class="logout-link">Log out</a></div>
+  <button type="button" class="network-fab" id="btn-network-diagram">Network diagram</button>
 </div>
 
 <script>
@@ -1118,6 +1176,64 @@
     backdrop.querySelector('#alert-ok').addEventListener('click', close);
   }
 
+  function openNetworkDiagramModal() {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'diagram-backdrop';
+    backdrop.innerHTML = `
+      <div class="diagram-modal">
+        <div class="diagram-modal-head">
+          <h2>How this tool is hosted and served</h2>
+          <button type="button" class="diagram-close-btn" id="diagram-close">&times;</button>
+        </div>
+        <div class="diagram-visual">
+          <svg width="100%" viewBox="0 0 680 286" role="img" aria-label="Hosting architecture diagram">
+            <title>Hosting architecture for the TIFTON Go-Live Tracker</title>
+            <desc>GitHub stores the source code and triggers a Cloudflare Worker deploy on every push. The Worker serves the site and API to the browser and reads and writes the shared issue list in a D1 database.</desc>
+            <defs>
+              <marker id="diagram-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M2 1L8 5L2 9" fill="none" stroke="#8a93a3" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </marker>
+            </defs>
+            <g>
+              <rect x="40" y="40" width="170" height="56" rx="8" fill="#f6f7f9" stroke="#d8dbe2" stroke-width="1"/>
+              <text x="125" y="58" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="600" fill="#1e2532">GitHub repo</text>
+              <text x="125" y="76" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#6b7383">Stores project code</text>
+            </g>
+            <g>
+              <rect x="270" y="40" width="210" height="56" rx="8" fill="#f6f7f9" stroke="#d8dbe2" stroke-width="1"/>
+              <text x="375" y="58" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="600" fill="#1e2532">Cloudflare Worker deploy</text>
+              <text x="375" y="76" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#6b7383">Deploys on every push</text>
+            </g>
+            <g>
+              <rect x="40" y="190" width="170" height="56" rx="8" fill="#f6f7f9" stroke="#d8dbe2" stroke-width="1"/>
+              <text x="125" y="208" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="600" fill="#1e2532">Browser</text>
+              <text x="125" y="226" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#6b7383">Loads the tracker</text>
+            </g>
+            <g>
+              <rect x="270" y="190" width="210" height="56" rx="8" fill="#e9f5ee" stroke="#c8e6d5" stroke-width="1"/>
+              <text x="375" y="208" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="600" fill="#3a6b52">Cloudflare Worker</text>
+              <text x="375" y="226" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#3a6b52">Password gate + site + API</text>
+            </g>
+            <g>
+              <rect x="505" y="190" width="125" height="56" rx="8" fill="#f2ecfb" stroke="#ddccf2" stroke-width="1"/>
+              <text x="567" y="208" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="600" fill="#6b4fa0">D1 database</text>
+              <text x="567" y="226" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#6b4fa0">Shared issue list</text>
+            </g>
+            <line x1="210" y1="68" x2="268" y2="68" stroke="#8a93a3" stroke-width="1.5" marker-end="url(#diagram-arrow)"/>
+            <line x1="375" y1="96" x2="375" y2="188" stroke="#8a93a3" stroke-width="1.5" marker-end="url(#diagram-arrow)"/>
+            <line x1="210" y1="218" x2="268" y2="218" stroke="#8a93a3" stroke-width="1.5" marker-end="url(#diagram-arrow)"/>
+            <line x1="480" y1="218" x2="503" y2="218" stroke="#8a93a3" stroke-width="1.5" marker-end="url(#diagram-arrow)"/>
+          </svg>
+          <div class="diagram-caption">A push to GitHub triggers a fresh Cloudflare Worker deploy (top row — deploy time). Your browser talks to that running Worker, which checks your password/session, serves the tracker's HTML/JS, and reads and writes the shared issue list in the D1 database (bottom row — request time).</div>
+        </div>
+      </div>
+    `;
+    ROOT.appendChild(backdrop);
+    const close = () => backdrop.remove();
+    backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(); });
+    backdrop.querySelector('#diagram-close').addEventListener('click', close);
+  }
+
   function parseAndValidateImport(text) {
     let parsed;
     try {
@@ -1583,6 +1699,7 @@
   document.getElementById('btn-add').addEventListener('click', () => openModal(null));
   document.getElementById('btn-copy-view').addEventListener('click', copyCurrentView);
   document.getElementById('btn-export').addEventListener('click', exportData);
+  document.getElementById('btn-network-diagram').addEventListener('click', openNetworkDiagramModal);
   document.getElementById('btn-import').addEventListener('click', openImportModal);
   document.getElementById('filter-area').addEventListener('change', render);
   document.getElementById('filter-status').addEventListener('change', render);
