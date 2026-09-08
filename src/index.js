@@ -42,8 +42,13 @@ export default {
 
     const authed = await isAuthenticated(request, env);
     if (!authed) {
-      const justFailed = url.pathname === "/login";
-      return renderLoginPage(justFailed);
+      // Note: this branch only ever renders the plain login page, never
+      // the error banner — a failed password attempt is handled directly
+      // inside handleLoginPost() above (which returns its own response),
+      // so there's no failed-login state to detect here. Checking the
+      // URL path alone (e.g. "== /login") would incorrectly show
+      // "Incorrect password" on a first, unsubmitted visit to that path.
+      return renderLoginPage(false);
     }
 
     if (url.pathname === "/api/issues") {
