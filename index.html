@@ -1,0 +1,1754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TIFTON Go-Live Tracker</title>
+<style>
+  #tifton-tracker {
+    --ink: #1b2027;
+    --ink-soft: #565f6c;
+    --paper: #f3f1ea;
+    --panel: #ffffff;
+    --line: #dcd8cc;
+    --steel: #3d5a73;
+    --steel-dark: #2b4256;
+    --steel-bg: #e4ebef;
+    --amber: #c4791f;
+    --amber-bg: #fbeee0;
+    --rust: #a3402f;
+    --rust-bg: #f8e6e1;
+    --moss: #4a6b4d;
+    --moss-bg: #e7efe4;
+    --slate: #6b7280;
+    --slate-bg: #eceae2;
+    --teal: #1f7a72;
+    --teal-bg: #daf0ee;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    color: var(--ink);
+    background: linear-gradient(180deg, #9AC6E2 0%, #263138 100%);
+    border-radius: 10px;
+    padding: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  #tifton-tracker * { box-sizing: border-box; }
+  #tifton-tracker .head {
+    padding: 22px 24px 18px;
+    background-color: #334249;
+    border-radius: 10px 10px 0 0;
+    border-bottom: 2px solid #1b2027;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  #tifton-tracker .eyebrow {
+    font-family: 'Oswald', 'Arial Narrow', sans-serif;
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    color: #9AC6E2;
+    margin: 0 0 4px;
+    font-weight: 600;
+  }
+  #tifton-tracker h1 {
+    font-family: 'Oswald', 'Arial Narrow', sans-serif;
+    font-size: 30px;
+    font-weight: 600;
+    margin: 0;
+    letter-spacing: -0.01em;
+    line-height: 1.05;
+    color: #f3f1ea;
+  }
+  #tifton-tracker .head-sub {
+    font-size: 13px;
+    color: #c3d4da;
+    margin-top: 6px;
+  }
+  #tifton-tracker .stat-row {
+    display: flex;
+    gap: 0;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--panel);
+  }
+  #tifton-tracker .stat {
+    padding: 8px 16px;
+    text-align: center;
+    border-right: 1px solid var(--line);
+    min-width: 74px;
+  }
+  #tifton-tracker .stat:last-child { border-right: none; }
+  #tifton-tracker .stat .n { font-family: 'Oswald', sans-serif; font-size: 20px; font-weight: 600; line-height: 1; }
+  #tifton-tracker .stat .l { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); margin-top: 3px; }
+  #tifton-tracker .stat.open .n { color: var(--rust); }
+  #tifton-tracker .stat.inprogress .n { color: var(--amber); }
+  #tifton-tracker .stat.testing .n { color: var(--steel); }
+  #tifton-tracker .stat.readyinstall .n { color: var(--slate); }
+  #tifton-tracker .stat.readycustomer .n { color: var(--moss); }
+  #tifton-tracker .stat.completed .n { color: var(--teal); }
+  #tifton-tracker .stat.blocker-stat {
+    cursor: pointer;
+    background: var(--rust-bg);
+    border-left: 2px solid var(--rust);
+  }
+  #tifton-tracker .stat.blocker-stat .n { color: var(--rust); }
+  #tifton-tracker .stat.blocker-stat .l { color: var(--rust); font-weight: 600; }
+  #tifton-tracker .stat.blocker-stat:hover { background: #f4d9d3; }
+  #tifton-tracker .stat.blocker-stat.active { background: var(--rust); }
+  #tifton-tracker .stat.blocker-stat.active .n,
+  #tifton-tracker .stat.blocker-stat.active .l { color: white; }
+
+  #tifton-tracker .toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px 24px;
+    border-bottom: 1px solid rgba(255,255,255,0.25);
+    background: rgba(255,255,255,0.12);
+  }
+  #tifton-tracker .toolbar-filters {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: space-between;
+  }
+  #tifton-tracker .toolbar-filters > * { flex: 1 1 0; min-width: 0; }
+  #tifton-tracker .toolbar-search {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  #tifton-tracker select, #tifton-tracker input[type=text] {
+    font-family: inherit;
+    font-size: 13px;
+    padding: 7px 10px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--panel);
+    color: var(--ink);
+  }
+  #tifton-tracker input[type=text] { width: 100%; max-width: 340px; }
+
+  #tifton-tracker .view-toggle {
+    display: flex;
+    border: 1px solid var(--ink);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-left: auto;
+  }
+  #tifton-tracker .view-toggle button {
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 7px 12px;
+    border: none;
+    border-right: 1px solid #d5d5d5;
+    background: var(--panel);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  #tifton-tracker .view-toggle button:last-child { border-right: none; }
+  #tifton-tracker .view-toggle button.active { background: var(--ink); color: var(--paper); border-right-color: var(--ink); }
+  #tifton-tracker .btn-add {
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 14px;
+    border: none;
+    border-radius: 6px;
+    background: var(--steel);
+    color: white;
+    cursor: pointer;
+  }
+  #tifton-tracker .btn-add:hover { background: var(--steel-dark); }
+  #tifton-tracker .btn-copy {
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 14px;
+    border: 1px solid var(--ink);
+    border-radius: 6px;
+    background: var(--panel);
+    color: var(--ink);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  #tifton-tracker .btn-copy:hover { background: var(--ink); color: var(--paper); }
+  #tifton-tracker .btn-copy.copied { background: var(--moss); border-color: var(--moss); color: white; }
+
+  #tifton-tracker .data-io {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    padding: 14px 24px 20px;
+    border-top: 1px solid rgba(243,241,234,0.25);
+  }
+  #tifton-tracker .btn-io {
+    display: inline-block;
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 7px 14px;
+    border: 1px solid rgba(243,241,234,0.5);
+    border-radius: 6px;
+    background: transparent;
+    color: rgba(243,241,234,0.85);
+    cursor: pointer;
+  }
+  #tifton-tracker .btn-io:hover { background: rgba(243,241,234,0.12); border-color: rgba(243,241,234,0.8); color: #f3f1ea; }
+  #tifton-tracker .logout-row { text-align: center; padding: 0 24px 16px; }
+  #tifton-tracker .logout-link { font-size: 11.5px; color: rgba(243,241,234,0.55); text-decoration: none; }
+  #tifton-tracker .logout-link:hover { text-decoration: underline; color: rgba(243,241,234,0.85); }
+
+  /* Network diagram */
+  #tifton-tracker .network-fab {
+    position: fixed;
+    bottom: 16px;
+    right: 20px;
+    z-index: 400;
+    background: rgba(51, 66, 73, 0.9);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.5);
+    border-radius: 20px;
+    padding: 7px 14px;
+    font-size: 12px;
+    font-family: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  #tifton-tracker .network-fab:hover { background: #334249; }
+  #tifton-tracker .diagram-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 26, 29, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 600;
+    padding: 20px;
+  }
+  #tifton-tracker .diagram-modal {
+    background: #fff;
+    border-radius: 14px;
+    padding: 20px;
+    max-width: 720px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  #tifton-tracker .diagram-modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  #tifton-tracker .diagram-modal-head h2 { font-size: 16px; font-weight: 700; margin: 0; color: var(--ink); font-family: 'Oswald', sans-serif; }
+  #tifton-tracker .diagram-close-btn {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: var(--paper);
+    color: var(--ink-soft);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 15px;
+    line-height: 1;
+  }
+  #tifton-tracker .diagram-close-btn:hover { background: var(--line); color: var(--ink); }
+  #tifton-tracker .diagram-visual {
+    background: linear-gradient(180deg, #9AC6E2 0%, #263138 100%);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  #tifton-tracker .diagram-caption { font-size: 13px; color: #fff; line-height: 1.5; margin-top: 12px; }
+  #tifton-tracker .diagram-security { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+  #tifton-tracker .diagram-security-title { font-size: 14px; font-weight: 700; color: var(--ink); margin: 0 0 8px; font-family: 'Oswald', sans-serif; }
+  #tifton-tracker .diagram-security-text { font-size: 13px; color: var(--ink-soft); line-height: 1.6; margin: 0 0 8px; }
+  #tifton-tracker .diagram-security-text:last-child { margin-bottom: 0; }
+  #tifton-tracker .visually-hidden-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  #tifton-tracker .body { padding: 18px 24px 26px; }
+
+  /* Board view */
+  #tifton-tracker .board {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    overflow-x: auto;
+    padding-bottom: 8px;
+  }
+  #tifton-tracker .board-col {
+    flex: 1 0 260px;
+    min-width: 260px;
+  }
+  #tifton-tracker .board-scrollbar-proxy {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 16px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    background: rgba(27,32,39,0.85);
+    z-index: 500;
+    display: none;
+  }
+  #tifton-tracker .board-scrollbar-proxy.visible { display: block; }
+  #tifton-tracker .board-scrollbar-proxy-inner { height: 1px; }
+  #tifton-tracker .col-head {
+    font-family: 'Oswald', sans-serif;
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    padding-bottom: 8px;
+    margin-bottom: 10px;
+    color: #334249;
+    border-bottom: 2px solid rgba(51,66,73,0.55);
+    display: flex;
+    justify-content: space-between;
+  }
+  #tifton-tracker .col-head span.count { color: rgba(51,66,73,0.7); font-weight: 400; }
+  #tifton-tracker .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--slate);
+    border-radius: 6px;
+    padding: 11px 12px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+  }
+  #tifton-tracker .card:hover { border-color: var(--ink); }
+  #tifton-tracker .card.open { border-left-color: var(--rust); }
+  #tifton-tracker .card.inprogress { border-left-color: var(--amber); }
+  #tifton-tracker .card.testing { border-left-color: var(--steel); }
+  #tifton-tracker .card.readyinstall { border-left-color: var(--slate); }
+  #tifton-tracker .card.readycustomer { border-left-color: var(--moss); }
+  #tifton-tracker .card.completed { border-left-color: var(--teal); }
+  #tifton-tracker .card-top { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+  #tifton-tracker .tag {
+    font-size: 10.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--steel-dark);
+    background: #e4ebef;
+    padding: 2px 7px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  #tifton-tracker .card-title { font-size: 13.5px; font-weight: 600; line-height: 1.3; margin-bottom: 3px; min-height: calc(1.3em * 2); }
+  #tifton-tracker .blocker-tag {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: white;
+    background: var(--rust);
+    padding: 2px 7px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  #tifton-tracker .meta-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+  #tifton-tracker .devops-tag {
+    display: inline-block;
+    font-family: monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--steel-dark);
+    background: #e4ebef;
+    border: 1px solid #c9d7de;
+    border-radius: 4px;
+    padding: 1px 7px;
+  }
+  #tifton-tracker .priority-tag {
+    display: inline-block;
+    font-size: 10.5px;
+    font-weight: 600;
+    border-radius: 4px;
+    padding: 1px 7px;
+  }
+  #tifton-tracker .priority-tag.high { background: var(--rust-bg); color: var(--rust); }
+  #tifton-tracker .priority-tag.medium { background: var(--amber-bg); color: var(--amber); }
+  #tifton-tracker .priority-tag.low { background: var(--slate-bg); color: var(--slate); }
+  #tifton-tracker .target-tag {
+    display: inline-block;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--steel-dark);
+    background: #e4ebef;
+    border-radius: 4px;
+    padding: 1px 7px;
+  }
+  #tifton-tracker .card-detail {
+    font-size: 12px;
+    color: var(--ink-soft);
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    min-height: calc(1.4em * 3);
+  }
+  #tifton-tracker .card-reported { font-size: 10.5px; color: var(--ink-soft); margin-top: 2px; }
+  #tifton-tracker .card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 8px;
+    margin-top: auto;
+    padding-top: 8px;
+  }
+
+  /* Table view */
+  #tifton-tracker table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  #tifton-tracker thead th {
+    text-align: left;
+    font-family: 'Oswald', sans-serif;
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #f3f1ea;
+    padding: 8px 10px;
+    border-bottom: 2px solid rgba(243,241,234,0.55);
+  }
+  #tifton-tracker tbody tr { background: rgba(255,255,255,0.9); }
+  #tifton-tracker tbody td { padding: 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  #tifton-tracker tbody tr:hover { background: #ffffff; cursor: pointer; }
+  #tifton-tracker .status-pill {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 100px;
+    white-space: nowrap;
+    display: inline-block;
+  }
+  #tifton-tracker .status-pill.open { background: var(--rust-bg); color: var(--rust); }
+  #tifton-tracker .status-pill.inprogress { background: var(--amber-bg); color: var(--amber); }
+  #tifton-tracker .status-pill.testing { background: var(--steel-bg); color: var(--steel); }
+  #tifton-tracker .status-pill.readyinstall { background: var(--slate-bg); color: var(--slate); }
+  #tifton-tracker .status-pill.readycustomer { background: var(--moss-bg); color: var(--moss); }
+  #tifton-tracker .status-pill.completed { background: var(--teal-bg); color: var(--teal); }
+
+  #tifton-tracker .empty { text-align: center; padding: 40px 20px; color: rgba(243,241,234,0.75); font-size: 13px; }
+
+  /* Calendar view */
+  #tifton-tracker .calendar {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  #tifton-tracker .cal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  #tifton-tracker .cal-month-label {
+    font-family: 'Oswald', sans-serif;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--ink);
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+  #tifton-tracker .cal-month-count { font-size: 12px; font-weight: 400; color: var(--ink-soft); }
+  #tifton-tracker .cal-nav {
+    font-family: inherit;
+    font-size: 18px;
+    font-weight: 600;
+    width: 30px;
+    height: 30px;
+    line-height: 1;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--paper);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  #tifton-tracker .cal-nav:hover { border-color: var(--ink); }
+  #tifton-tracker .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+  }
+  #tifton-tracker .cal-grid-head { margin-bottom: 6px; }
+  #tifton-tracker .cal-dayname {
+    text-align: center;
+    font-size: 10.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ink-soft);
+    padding-bottom: 4px;
+  }
+  #tifton-tracker .cal-cell {
+    min-height: 64px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 6px;
+    position: relative;
+  }
+  #tifton-tracker .cal-cell.empty { border-color: transparent; }
+  #tifton-tracker .cal-daynum { font-size: 12px; color: var(--ink-soft); }
+  #tifton-tracker .cal-cell.is-today .cal-daynum { color: var(--steel); font-weight: 700; }
+  #tifton-tracker .cal-cell.is-today { border-color: var(--steel); border-width: 2px; }
+  #tifton-tracker .cal-cell.has-due {
+    cursor: pointer;
+    background: var(--rust-bg);
+    border-color: var(--rust);
+  }
+  #tifton-tracker .cal-cell.has-due:hover { background: #f4d9d3; }
+  #tifton-tracker .cal-cell.has-due.is-selected { background: var(--rust); border-color: var(--rust); }
+  #tifton-tracker .cal-cell.has-due.is-selected .cal-daynum,
+  #tifton-tracker .cal-cell.has-due.is-selected .cal-count { color: white; }
+  #tifton-tracker .cal-count {
+    position: absolute;
+    bottom: 6px;
+    right: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--rust);
+  }
+  #tifton-tracker .cal-detail {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  #tifton-tracker .cal-detail-header {
+    font-family: 'Oswald', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink);
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+  }
+  #tifton-tracker .cal-detail-header .count { font-weight: 400; color: var(--ink-soft); }
+  #tifton-tracker .cal-detail-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+
+  /* Completed view */
+  #tifton-tracker .completed-wrap {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  #tifton-tracker .completed-header {
+    font-family: 'Oswald', sans-serif;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--teal);
+    border-bottom: 2px solid var(--teal);
+    padding-bottom: 8px;
+    margin-bottom: 14px;
+  }
+  #tifton-tracker .completed-header .count { font-weight: 400; color: rgba(243,241,234,0.75); }
+  #tifton-tracker .completed-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+
+  /* Modal */
+  #tifton-tracker .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(27,32,39,0.5);
+    display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px;
+  }
+  #tifton-tracker .modal {
+    background: var(--panel); border-radius: 10px; padding: 24px;
+    max-width: 480px; width: 100%; max-height: 86vh; overflow-y: auto;
+    border: 1px solid var(--line);
+  }
+  #tifton-tracker .modal h2 { font-family: 'Oswald', sans-serif; font-size: 18px; margin: 0 0 14px; }
+  #tifton-tracker .field { margin-bottom: 12px; }
+  #tifton-tracker .field label { display: block; font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); margin-bottom: 4px; }
+  #tifton-tracker .field input, #tifton-tracker .field select, #tifton-tracker .field textarea {
+    width: 100%; font-family: inherit; font-size: 13.5px; padding: 8px 10px;
+    border: 1px solid var(--line); border-radius: 6px; background: var(--paper);
+  }
+  #tifton-tracker .field textarea { min-height: 70px; resize: vertical; }
+  #tifton-tracker .field-row { display: flex; gap: 10px; }
+  #tifton-tracker .field-row .field { flex: 1; }
+  #tifton-tracker .modal-actions { display: flex; justify-content: space-between; margin-top: 18px; gap: 8px; }
+  #tifton-tracker .btn-primary {
+    font-family: inherit; font-weight: 600; font-size: 13px; padding: 9px 16px;
+    border: none; border-radius: 6px; background: var(--steel); color: white; cursor: pointer;
+  }
+  #tifton-tracker .btn-secondary {
+    font-family: inherit; font-weight: 600; font-size: 13px; padding: 9px 16px;
+    border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); cursor: pointer;
+  }
+  #tifton-tracker .btn-delete {
+    font-family: inherit; font-weight: 600; font-size: 13px; padding: 9px 16px;
+    border: none; border-radius: 6px; background: transparent; color: var(--rust); cursor: pointer;
+  }
+  #tifton-tracker .save-note { font-size: 11px; color: rgba(243,241,234,0.7); text-align: right; padding: 0 24px 14px; }
+
+  @media (max-width: 480px) {
+    #tifton-tracker .head { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+
+<div id="tifton-tracker">
+  <div class="head">
+    <div>
+      <p class="eyebrow">HY-TEK &middot; DELTA GALIL</p>
+      <h1>TIFTON Go-Live Tracker</h1>
+      <p class="head-sub" id="header-summary">Loading&hellip;</p>
+    </div>
+    <div class="stat-row" id="stat-row"></div>
+  </div>
+
+  <div class="toolbar">
+    <div class="toolbar-filters">
+      <select id="filter-area"><option value="">All areas</option></select>
+      <select id="filter-status">
+        <option value="">All statuses</option>
+      </select>
+      <select id="filter-blocker">
+        <option value="">Blocker: All</option>
+        <option value="Y">Walmart blocker only</option>
+        <option value="N">Not a blocker</option>
+      </select>
+      <select id="filter-missing">
+        <option value="">Missing info: All</option>
+        <option value="devops">Missing DevOps #</option>
+        <option value="target">Missing Due Date</option>
+        <option value="either">Missing DevOps # or Due Date</option>
+      </select>
+      <button class="btn-add" id="btn-add">+ Add issue</button>
+      <button class="btn-copy" id="btn-copy-view">Copy view</button>
+    </div>
+    <div class="toolbar-search">
+      <input type="text" id="search" placeholder="Search issues...">
+      <div class="view-toggle" id="view-toggle">
+        <button data-view="board" class="active">Board</button>
+        <button data-view="table">Table</button>
+        <button data-view="calendar">Calendar</button>
+        <button data-view="completed">Completed</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="body" id="body"></div>
+  <div class="board-scrollbar-proxy" id="board-scrollbar-proxy">
+    <div class="board-scrollbar-proxy-inner" id="board-scrollbar-proxy-inner"></div>
+  </div>
+  <div class="save-note" id="save-note">Loading&hellip;</div>
+  <div class="data-io">
+    <button class="btn-io" id="btn-export">Export JSON</button>
+    <button class="btn-io" id="btn-import">Import JSON</button>
+  </div>
+  <div class="logout-row"><a href="/logout" class="logout-link">Log out</a></div>
+  <button type="button" class="network-fab" id="btn-network-diagram">Network diagram</button>
+</div>
+
+<script>
+(function() {
+  const ROOT = document.getElementById('tifton-tracker');
+  const CURRENT_DATA_VERSION = 7; // bump this whenever the seed data below should replace what's saved
+
+  const SEED_ISSUES = [
+    {id:"raid-0", area:"Exotec", title:"Turn light blue when final pick is cut, and order is in complete status.", detail:"Turn light blue when final pick is cut, and order is in complete status.", status:"inprogress", owner:"James Adams", devops:"19923", priority:"High", blocker:"Y", targetDate:"2026-09-11", notes:"", reportedDate:""},
+    {id:"raid-1", area:"Inventory", title:"Confirm Bin Qty at Decant (FDD17676)", detail:"Confirm Bin Qty at Decant (FDD17676)", status:"inprogress", owner:"Hy-Tek", devops:"17676", priority:"Medium", blocker:"N", targetDate:"2026-10-09", notes:"", reportedDate:""},
+    {id:"raid-2", area:"Labeling", title:"Goods out of Pallet Label (FDD 17681)", detail:"Goods out of Pallet Label (FDD 17681)", status:"inprogress", owner:"Hy-Tek", devops:"17681", priority:"Medium", blocker:"N", targetDate:"2026-08-14", notes:"", reportedDate:""},
+    {id:"raid-3", area:"Packing", title:"Pack Station Box Recommendation (FDD18099)", detail:"Pack Station Box Recommendation (FDD18099)", status:"inprogress", owner:"Hy-Tek", devops:"18099", priority:"High", blocker:"N", targetDate:"2026-10-16", notes:"", reportedDate:""},
+    {id:"raid-4", area:"Exotec", title:"Remove chute-order relationship when picks are cancelled/cut", detail:"Ensure order relationship with chute is removed when all picks are concelled or cut from an orders", status:"inprogress", owner:"Mike Loop", devops:"22994", priority:"High", blocker:"Y/N", targetDate:"2026-09-11", notes:"", reportedDate:""},
+    {id:"raid-5", area:"Packing", title:"Packstation -Transient Data is getting stuck when user gets an error", detail:"Packstation -Transient Data is getting stuck when user gets an error", status:"inprogress", owner:"Roxie", devops:"24446", priority:"High", blocker:"Y", targetDate:"2026-09-11", notes:"", reportedDate:""},
+    {id:"raid-6", area:"RF / Devices", title:"Webtool release-user should also release the associated pick", detail:"Webtool to release user like kicking RF user but also releases the pick associated with user.", status:"inprogress", owner:"Michael Adamski", devops:"24546", priority:"High", blocker:"Y", targetDate:"2026-09-14", notes:"", reportedDate:""},
+    {id:"raid-7", area:"Inventory", title:"Validation/error-handling enhancements for SKU setup & wave release checks", detail:"Proposed validation/error handling enhancements around SKU setup and wave release checks.", status:"inprogress", owner:"Mike Loop", devops:"24713", priority:"High", blocker:"Y", targetDate:"2026-09-18", notes:"", reportedDate:""},
+    {id:"raid-8", area:"Shipping", title:"LTL MUs that are flipping to shipped", detail:"LTL MUs that are flipping to shipped", status:"inprogress", owner:"", devops:"25126", priority:"High", blocker:"Y", targetDate:"", notes:"Just came in", reportedDate:""},
+    {id:"raid-9", area:"Inventory", title:"DG - S-LAN locations have Loc_Allocation records", detail:"DG - S-LAN locations have Loc_Allocation records", status:"inprogress", owner:"Michael Adamski", devops:"25087", priority:"High", blocker:"Y", targetDate:"2026-09-18", notes:"", reportedDate:""},
+    {id:"raid-10", area:"Exotec", title:"JC Penny and KOHL's solution for divided orders - infinity chute", detail:"JC Penny and KOHL's solution for divided orders - infinity chute", status:"open", owner:"", devops:"", priority:"High", blocker:"N", targetDate:"", notes:"FDD to be created", reportedDate:""},
+    {id:"raid-11", area:"Equipment", title:"Lights for Tompkins for the bins (3 lights versus 2)", detail:"Lights for Tompkins for the bins (3 lights versus 2)", status:"open", owner:"", devops:"24368", priority:"High", blocker:"N", targetDate:"2026-08-28", notes:"", reportedDate:""},
+    {id:"raid-12", area:"Inventory", title:"Inventory Discrepancies", detail:"Inventory Discrepancies", status:"open", owner:"", devops:"", priority:"High", blocker:"N", targetDate:"", notes:"", reportedDate:""},
+    {id:"raid-13", area:"Inventory", title:"location ID pre-populates after dropping to CASI000001 the first time. (FDD)", detail:"location ID pre-populates after dropping to CASI000001 the first time. (FDD)", status:"open", owner:"Hy-Tek", devops:"14197", priority:"Low", blocker:"N", targetDate:"", notes:"FDD to be created", reportedDate:""},
+    {id:"raid-14", area:"Exotec", title:"Pick larger items before smaller (Exotec/Tompkins)", detail:"Pick larger items before smaller from Exotec and Tompkins. #4 Medium. (FDD)", status:"open", owner:"Hy-Tek", devops:"17684", priority:"Low", blocker:"N", targetDate:"", notes:"FDD to be created", reportedDate:""},
+    {id:"raid-15", area:"Inventory", title:"Bin Divisions (FDD)", detail:"Bin Divisions (FDD)", status:"open", owner:"Hy-Tek", devops:"17683", priority:"Low", blocker:"N", targetDate:"", notes:"FDD to be created", reportedDate:""},
+    {id:"raid-16", area:"Inbound", title:"Inbound Hospital Pallets", detail:"Inbound Hospital Pallets", status:"open", owner:"Delta Galil Ops, Hy-Tek", devops:"13997", priority:"Low", blocker:"N", targetDate:"", notes:"FDD to be revised", reportedDate:""},
+    {id:"raid-17", area:"Exotec", title:"Lowercase SKUs failing to decant to Exotec", detail:"Decanting in lowercase SKUs to Exotec. Part of UPC build, failed during testing.", status:"open", owner:"Hy-Tek", devops:"23126", priority:"Low", blocker:"N", targetDate:"2026-08-04", notes:"", reportedDate:""},
+    {id:"raid-18", area:"Consolidation", title:"Direct consolidated pallets to specific shipping lane", detail:"Direct users with consolidated pallets to specific shipping lane(FDD17678)", status:"open", owner:"Hy-Tek", devops:"17678", priority:"Low", blocker:"N", targetDate:"", notes:"ON HOLD - DEV", reportedDate:""},
+    {id:"raid-19", area:"Shipping", title:"Outbound QC percentage Codes entries (FDD 18277)", detail:"Outbound QC percentage Codes entries (FDD 18277)", status:"open", owner:"Hy-Tek", devops:"18277", priority:"Low", blocker:"N", targetDate:"2026-08-14", notes:"", reportedDate:""},
+    {id:"raid-20", area:"RF / Devices", title:"Logout should clear user from Session table", detail:"Webtools/UI Logging off needs to remove from Session table. (FDD)", status:"open", owner:"Hy-Tek", devops:"20958", priority:"Medium", blocker:"N", targetDate:"", notes:"FDD to be created", reportedDate:""},
+    {id:"raid-21", area:"Exotec", title:"DG -Oversized bin at Exotec creating 008 error message", detail:"DG -Oversized bin at Exotec creating 008 error message", status:"open", owner:"", devops:"24284", priority:"Medium", blocker:"N", targetDate:"", notes:"", reportedDate:""},
+    {id:"raid-22", area:"Consolidation", title:"RF Consolidation Flow (FDD)", detail:"RF Consolidation Flow (FDD)", status:"open", owner:"", devops:"24187", priority:"", blocker:"N", targetDate:"", notes:"FDD to be created", reportedDate:""},
+    {id:"raid-23", area:"Shipping", title:"Outbound Sorter Destination (FDD)", detail:"Outbound Sorter Destination (FDD)", status:"open", owner:"", devops:"24186", priority:"", blocker:"N", targetDate:"", notes:"FDD to be created", reportedDate:""},
+    {id:"raid-24", area:"RF / Devices", title:"Speed of scanning case packs on the floor locations.", detail:"Speed of scanning case packs on the floor locations.", status:"open", owner:"", devops:"24398", priority:"Medium", blocker:"N", targetDate:"", notes:"", reportedDate:""},
+    {id:"raid-25", area:"Exotec", title:"Mission sent to a bot on the bottom to go to a chute on the top level", detail:"Mission sent to a bot on the bottom to go to a chute on the top level", status:"open", owner:"", devops:"24436", priority:"Low", blocker:"", targetDate:"", notes:"", reportedDate:""},
+    {id:"raid-26", area:"Reporting", title:"Wave containerization report should include ship-to customer ID & carrier code", detail:"DG -Update the wave containerization report to look at ship_to_customer_ID and also carrier code", status:"open", owner:"", devops:"24694", priority:"Medium", blocker:"N", targetDate:"", notes:"", reportedDate:""},
+    {id:"raid-27", area:"Inventory", title:"Loc to loc move to give a clearer error message", detail:"Loc to loc move to give a clearer error message", status:"open", owner:"", devops:"24717", priority:"", blocker:"N", targetDate:"", notes:"", reportedDate:""},
+    {id:"raid-28", area:"Reporting", title:"Archiving BULK pick_queue records.", detail:"Archiving BULK pick_queue records.", status:"open", owner:"", devops:"24735", priority:"", blocker:"N", targetDate:"", notes:"", reportedDate:""},
+    {id:"raid-29", area:"Shipping", title:"Create a 0120 with mu_id", detail:"Create a 0120 with mu_id", status:"open", owner:"Steve", devops:"24820", priority:"", blocker:"N", targetDate:"", notes:"", reportedDate:""},
+    {id:"raid-30", area:"Exotec", title:"Order incorrectly assigned ORDR_SHIP_PGSN instead of routing through Exotec", detail:"Assigned a ORDR_SHIP_PGSN, when it should have just gone through Exotec.", status:"open", owner:"Alex", devops:"24957", priority:"High", blocker:"Y", targetDate:"", notes:"New just came in", reportedDate:""},
+    {id:"raid-31", area:"Exotec", title:"Show bag image indicator on Decant/Exotec/T-Sort screens", detail:"Decant/Exotec/TSORT - They want to display an image signifying the bag on these screens", status:"open", owner:"Jim", devops:"25048", priority:"", blocker:"", targetDate:"", notes:"New just came in", reportedDate:""},
+    {id:"raid-32", area:"Packing", title:"Pack station SKU summary gets cluttered with a new line per QTY scanned", detail:"Pack Station - The process of scanning UPCs and entering QTYs in pack station gets cumbersome to verify on screen because each QTY added to the pack LPN gets a new line in the SKU summary section.", status:"open", owner:"Jim", devops:"25049", priority:"", blocker:"", targetDate:"", notes:"FDD to be created", reportedDate:""},
+    {id:"raid-33", area:"Deployment", title:"Decant/split bin UOM", detail:"Decant/split bin UOM", status:"open", owner:"Beth", devops:"25090", priority:"High", blocker:"Y", targetDate:"2026-09-11", notes:"", reportedDate:""},
+    {id:"raid-34", area:"Packing", title:"Hospital screen-Pack-Out Workflow Cannot Reach Dock Status", detail:"Hospital screen-Pack-Out Workflow Cannot Reach Dock Status", status:"open", owner:"Hoang", devops:"25139", priority:"High", blocker:"Y", targetDate:"", notes:"", reportedDate:""},
+    {id:"raid-35", area:"RF / Devices", title:"DG- RF Drop LPN delays", detail:"DG- RF Drop LPN delays", status:"open", owner:"Hoang", devops:"25136", priority:"Medium", blocker:"Y", targetDate:"", notes:"", reportedDate:""},
+    {id:"raid-36", area:"Consolidation", title:"DG- RF Outbound Consolidator delays", detail:"DG- RF Outbound Consolidator delays", status:"open", owner:"Hoang", devops:"25137", priority:"Medium", blocker:"Y", targetDate:"", notes:"", reportedDate:""},
+    {id:"raid-37", area:"Reporting", title:"Wave Containerization Report Mismatch", detail:"Wave Containerization Report Mismatch", status:"open", owner:"Jake", devops:"25201", priority:"Medium", blocker:"", targetDate:"", notes:"Just came in", reportedDate:""},
+    {id:"raid-38", area:"Deployment", title:"DG UOM - GTP wrong quantities sending to Exotec", detail:"DG UOM - GTP wrong quantities sending to Exotec", status:"open", owner:"Antoine", devops:"25191", priority:"High", blocker:"Y", targetDate:"", notes:"Part of Bag UOM", reportedDate:""},
+    {id:"raid-39", area:"Inventory", title:"Not all allocated qty is being removed from CASI", detail:"Not all allocated qty is being removed from CASI", status:"testing", owner:"James Haumann", devops:"20921", priority:"High", blocker:"Y/N", targetDate:"2026-08-14", notes:"", reportedDate:""},
+    {id:"raid-40", area:"T-Sort", title:"DG - Print_Data records changing during picking process", detail:"DG - Print_Data records changing during picking process", status:"testing", owner:"Hoang", devops:"24214", priority:"High", blocker:"Y", targetDate:"2026-09-11", notes:"", reportedDate:""},
+    {id:"raid-41", area:"Shipping", title:"WALCP0813 released with incorrect ship_day/WXSOrderType values", detail:"DG released WALCP0813. ship_day was MA and WXSOrderType in print_data was MANUAL", status:"testing", owner:"Michael Adamski", devops:"24460", priority:"High", blocker:"Y", targetDate:"2026-09-07", notes:"", reportedDate:""},
+    {id:"raid-42", area:"Shipping", title:"Ship parent MU when all child MU's are shipped", detail:"Ship parent MU when all child MU's are shipped", status:"testing", owner:"", devops:"24116", priority:"High", blocker:"N", targetDate:"2026-08-12", notes:"", reportedDate:""},
+    {id:"raid-43", area:"Inbound", title:"Inbound pallet assignment should consider all ASNs assigned to a door", detail:"Inbound Pallet Assignments to need look at all assigned ASNs to Door for creating pallet assignments (FDD)", status:"testing", owner:"Delta Galil Ops", devops:"19968", priority:"Medium", blocker:"N", targetDate:"2026-08-07", notes:"", reportedDate:""},
+    {id:"raid-44", area:"Shipping", title:"EDI Routing Process (FDD 10521 /13999/18395)", detail:"EDI Routing Process (FDD 10521 /13999/18395)", status:"testing", owner:"Hoang", devops:"10521 /13999/18395", priority:"High", blocker:"Y", targetDate:"2026-08-11", notes:"", reportedDate:""},
+    {id:"raid-45", area:"Inbound", title:"Inbound receipts", detail:"Inbound receipts", status:"testing", owner:"Hy-Tek", devops:"20918", priority:"High", blocker:"N", targetDate:"2026-08-14", notes:"", reportedDate:""},
+    {id:"raid-46", area:"Packing", title:"Pack station Complete button turns green without an actual scan", detail:"Packstation complete button turning green when user scans even when they dont scan anything", status:"testing", owner:"Roxie", devops:"24338", priority:"High", blocker:"Y", targetDate:"2026-09-11", notes:"", reportedDate:""},
+    {id:"raid-47", area:"Shipping", title:"DG- Missing VLOX record for an OB sorter destination", detail:"DG- Missing VLOX record for an OB sorter destination", status:"testing", owner:"Hoang", devops:"24545", priority:"High", blocker:"Y", targetDate:"", notes:"Working to get an example and correct. 9/11/26", reportedDate:""},
+    {id:"raid-48", area:"Shipping", title:"MUs not flipping to shipped status", detail:"MUs Not flipping - JIm found an issue 8/14/26", status:"testing", owner:"Corbin Carter", devops:"24548", priority:"High", blocker:"Y", targetDate:"2026-09-11", notes:"", reportedDate:""},
+    {id:"raid-49", area:"Exotec", title:"CasePick allowed picks with no allocated qty in CASI (260 incomplete picks)", detail:"CasePick validation issue where users were able to pick SKUs onto robots with no allocated quantity in CASI, resulting in 260 incomplete picks on wave WAL081802.", status:"testing", owner:"James Haumann", devops:"24712", priority:"High", blocker:"Y", targetDate:"", notes:"Waiting for Bag uom", reportedDate:""},
+    {id:"raid-50", area:"Shipping", title:"Shipment overshipped item", detail:"Shipment overshipped item", status:"testing", owner:"James Haumann", devops:"24714", priority:"High", blocker:"Y", targetDate:"2026-09-04", notes:"", reportedDate:""},
+    {id:"raid-51", area:"T-Sort", title:"Wave pick casecut incorrectly updating loc_allocation during picking", detail:"Issue with the way wave pick casecut is updating loc_allocation during the pricking process.", status:"testing", owner:"James", devops:"24922", priority:"High", blocker:"Y", targetDate:"2026-09-11", notes:"9/4 - Short term fix - 9/11/2026 - long term", reportedDate:""},
+    {id:"raid-52", area:"Inventory", title:"WALCP wave created picks/replens with no inventory in the building", detail:"DG- WALCP. This is a wave of Walmart casepacks created pick and Replens. However, no inventory in the building", status:"testing", owner:"Hoang", devops:"24943", priority:"High", blocker:"Y", targetDate:"", notes:"New just came in", reportedDate:""},
+    {id:"raid-53", area:"Deployment", title:"Deliver Bag UoM change (FDD 14185)", detail:"Deliver Bag UoM change (FDD 14185)", status:"readycustomer", owner:"Steve", devops:"Parent 14185, 24242", priority:"High", blocker:"Y", targetDate:"2026-08-18", notes:"", reportedDate:""},
+    {id:"raid-54", area:"T-Sort", title:"Case quantities must be divisible by T-Sort values (T-Sort Max limitation)", detail:"System limitation requiring case quantities to be divisible by T-sort values; the team aligned on the need to support flexible quantities based on bot capacity rather than SKU divisibility. Tsort max issue.", status:"readyinstall", owner:"Jim Harjo", devops:"24017", priority:"High", blocker:"Y", targetDate:"2026-08-28", notes:"", reportedDate:""},
+    {id:"raid-55", area:"Exotec", title:"Robot max for Exotec - system only allows Exotec to pick 1", detail:"Robot max for Exotec - system only allows Exotec to pick 1", status:"readycustomer", owner:"DG", devops:"24117", priority:"High", blocker:"Y", targetDate:"2026-08-04", notes:"", reportedDate:""},
+    {id:"raid-56", area:"Inbound", title:"Inbound Dashboard", detail:"Inbound Dashboard", status:"readycustomer", owner:"Hy-Tek", devops:"20919", priority:"Medium", blocker:"N", targetDate:"2026-07-31", notes:"", reportedDate:""},
+    {id:"raid-57", area:"Exotec", title:"user_ID should update to GTP_INVNT when a pick routes to Exotec", detail:"When a pick gets sent to Exotec, user_ID needs to update to GTP_INVNT to show no inventory for SKU in system.", status:"readycustomer", owner:"Hy-Tek", devops:"19948", priority:"High", blocker:"Y", targetDate:"2026-08-04", notes:"", reportedDate:""},
+    {id:"raid-58", area:"Inventory", title:"Overriding bins when the qty is zero", detail:"Overriding bins when the qty is zero", status:"readyinstall", owner:"Hy-Tek", devops:"19942", priority:"Medium", blocker:"N", targetDate:"2026-06-12", notes:"", reportedDate:""},
+    {id:"raid-59", area:"Exotec", title:"No divert lane assignment received error on CasePick screen from Tompkins", detail:"No divert lane assignment received error on CasePick screen from Tompkins", status:"readyinstall", owner:"Hy-Tek", devops:"20962", priority:"Medium", blocker:"N", targetDate:"2026-08-14", notes:"", reportedDate:""},
+    {id:"raid-60", area:"Shipping", title:"Outbound Sortation Configuration Dashboard (route customers to lanes)", detail:"Outbound Sortation Configuration Dashboard. - Tool for DG to route customers to specific lanes.", status:"readyinstall", owner:"Hy-Tek", devops:"20922", priority:"Medium", blocker:"N", targetDate:"2026-07-10", notes:"", reportedDate:""},
+    {id:"raid-61", area:"Exotec", title:"Exotec SKU description / SKU property mismatch", detail:"Exotec SKU Description - SKU Property (FDD 18278) - 7/30 Test on 58 (send in a pick, look at it on the pick).", status:"readyinstall", owner:"Hy-Tek", devops:"18278", priority:"High", blocker:"N", targetDate:"2026-08-11", notes:"", reportedDate:""},
+    {id:"raid-62", area:"Exotec", title:"Pick Queue is not updating user id when an Exotec Pick is completed", detail:"Pick Queue is not updating user id when an Exotec Pick is completed", status:"readyinstall", owner:"Hy-Tek", devops:"19357", priority:"High", blocker:"N", targetDate:"2026-08-11", notes:"", reportedDate:""},
+  ];
+
+  const STATUS_LABELS = { open: 'Open', inprogress: 'In Progress (DEV)', testing: 'Testing (PSO)', readyinstall: 'Ready for Install', readycustomer: 'Ready for Customer', completed: 'Completed' };
+  const STATUS_ORDER = ['open', 'inprogress', 'testing', 'readyinstall', 'readycustomer', 'completed'];
+
+  let issues = [];
+  let currentView = 'board';
+  let calendarMonth = (() => {
+    const d = new Date();
+    return { year: d.getFullYear(), month: d.getMonth() };
+  })();
+  let selectedCalendarDate = null;
+  let editingId = null;
+  let activeBoardEl = null;
+
+  async function loadIssues() {
+    try {
+      const res = await fetch('/api/issues');
+      if (!res.ok) throw new Error('Failed to load issues: ' + res.status);
+      const payload = await res.json();
+      const storedVersion = payload.dataVersion || 0;
+
+      if (storedVersion < CURRENT_DATA_VERSION) {
+        // Fresh dataset supersedes whatever was previously saved.
+        issues = SEED_ISSUES.slice();
+        await saveIssues();
+        return;
+      }
+
+      issues = Array.isArray(payload.issues) ? payload.issues : [];
+      migrateRemovedStatuses();
+    } catch (e) {
+      console.error('Load error', e);
+      issues = SEED_ISSUES.slice();
+      const noteEl = document.getElementById('save-note');
+      if (noteEl) { noteEl.textContent = 'Could not reach the database — showing default data'; }
+    }
+  }
+
+  // Fixes up any saved issues still carrying a status value that no longer exists
+  // in the app (e.g. the retired "watching" status), without touching anything else.
+  function migrateRemovedStatuses() {
+    let changed = false;
+    issues.forEach(i => {
+      if (!STATUS_ORDER.includes(i.status)) {
+        i.status = 'open';
+        changed = true;
+      }
+    });
+    if (changed) saveIssues();
+  }
+
+  async function saveIssues() {
+    const noteEl = document.getElementById('save-note');
+    try {
+      const res = await fetch('/api/issues', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ issues, dataVersion: CURRENT_DATA_VERSION }),
+      });
+      if (!res.ok) throw new Error('Save failed: ' + res.status);
+      if (noteEl) { noteEl.textContent = 'Saved · shared with everyone using this tracker'; }
+    } catch (e) {
+      if (noteEl) { noteEl.textContent = 'Could not save — changes may not persist'; }
+      console.error('Storage error', e);
+    }
+  }
+
+  function uniqueAreas() {
+    return [...new Set(issues.map(i => i.area))].sort();
+  }
+
+  function populateFilters() {
+    const areaSel = document.getElementById('filter-area');
+    const curArea = areaSel.value;
+    areaSel.innerHTML = '<option value="">All areas</option>' + uniqueAreas().map(a => `<option value="${a}">${a}</option>`).join('');
+    areaSel.value = curArea;
+
+    const statusSel = document.getElementById('filter-status');
+    const curStatus = statusSel.value;
+    statusSel.innerHTML = '<option value="">All statuses</option>' + STATUS_ORDER.map(s => `<option value="${s}">${STATUS_LABELS[s]}</option>`).join('');
+    statusSel.value = curStatus;
+  }
+
+  function getFiltered() {
+    const area = document.getElementById('filter-area').value;
+    const status = document.getElementById('filter-status').value;
+    const blockerFilter = document.getElementById('filter-blocker').value;
+    const missingFilter = document.getElementById('filter-missing').value;
+    const q = document.getElementById('search').value.trim().toLowerCase();
+    return issues.filter(i => {
+      if (area && i.area !== area) return false;
+      if (status && i.status !== status) return false;
+      if (blockerFilter === 'Y' && !isBlocker(i.blocker)) return false;
+      if (blockerFilter === 'N' && isBlocker(i.blocker)) return false;
+      const missingDevops = !i.devops;
+      const missingTarget = !i.targetDate;
+      if (missingFilter === 'devops' && !missingDevops) return false;
+      if (missingFilter === 'target' && !missingTarget) return false;
+      if (missingFilter === 'either' && !(missingDevops || missingTarget)) return false;
+      if (q) {
+        const hay = (i.title + ' ' + i.detail + ' ' + i.area + ' ' + (i.owner||'') + ' ' + (i.devops||'') + ' ' + (i.notes||'')).toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }
+
+  function renderStats() {
+    const counts = {};
+    STATUS_ORDER.forEach(s => { counts[s] = 0; });
+    issues.forEach(i => { counts[i.status] = (counts[i.status]||0) + 1; });
+    const blockerCount = issues.filter(i => isBlocker(i.blocker)).length;
+    const blockerActive = document.getElementById('filter-blocker').value === 'Y';
+    const row = document.getElementById('stat-row');
+    row.innerHTML = STATUS_ORDER.map(s =>
+      `<div class="stat ${s}"><div class="n">${counts[s]}</div><div class="l">${STATUS_LABELS[s]}</div></div>`
+    ).join('') + `<div class="stat blocker-stat${blockerActive ? ' active' : ''}" id="blocker-stat" title="Click to show only Walmart blockers"><div class="n">${blockerCount}</div><div class="l">Walmart Blockers</div></div>`;
+    document.getElementById('blocker-stat').addEventListener('click', () => {
+      const sel = document.getElementById('filter-blocker');
+      sel.value = sel.value === 'Y' ? '' : 'Y';
+      render();
+    });
+  }
+
+  function renderHeaderSummary() {
+    const el = document.getElementById('header-summary');
+    const n = issues.length;
+    el.textContent = n === 0 ? 'No issues yet' : `${n} tracked issue${n === 1 ? '' : 's'}`;
+  }
+
+  function formatDate(iso) {
+    if (!iso) return '';
+    const [y, m, d] = iso.split('-').map(Number);
+    const dt = new Date(y, m - 1, d);
+    return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function isBlocker(blocker) {
+    return blocker === 'Y' || blocker === 'Y/N';
+  }
+
+  function cardHtml(issue) {
+    const priorityClass = (issue.priority || '').toLowerCase();
+    return `
+      <div class="card ${issue.status}" data-id="${issue.id}">
+        <div class="card-top">
+          <span class="tag">${issue.area}</span>
+          ${isBlocker(issue.blocker) ? `<span class="blocker-tag">Walmart blocker${issue.blocker === 'Y/N' ? ' (Y/N)' : ''}</span>` : ''}
+        </div>
+        <div class="card-title">${issue.title}</div>
+        <div class="meta-row">
+          ${issue.priority ? `<span class="priority-tag ${priorityClass}">${issue.priority} priority</span>` : ''}
+          ${issue.targetDate ? `<span class="target-tag">Target: ${formatDate(issue.targetDate)}</span>` : ''}
+        </div>
+        <div class="card-detail">${issue.detail}</div>
+        <div class="card-footer">
+          <div>
+            ${issue.reportedDate ? `<div class="card-reported">Reported ${formatDate(issue.reportedDate)}</div>` : ''}
+          </div>
+          ${issue.devops ? `<span class="devops-tag">DevOps #${issue.devops}</span>` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderBoard(list) {
+    const cols = STATUS_ORDER.map(st => {
+      const items = list.filter(i => i.status === st);
+      return `
+        <div class="board-col">
+          <div class="col-head">${STATUS_LABELS[st]} <span class="count">${items.length}</span></div>
+          ${items.map(cardHtml).join('') || '<div class="empty">No issues</div>'}
+        </div>
+      `;
+    }).join('');
+    return `<div class="board">${cols}</div>`;
+  }
+
+  function renderTable(list) {
+    const sorted = list.slice().sort((a,b) => {
+      const statusDiff = STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status);
+      return statusDiff !== 0 ? statusDiff : a.title.localeCompare(b.title);
+    });
+    if (!sorted.length) return '<div class="empty">No issues match these filters</div>';
+    return `
+      <table>
+        <thead><tr><th>Area</th><th>Issue</th><th>DevOps #</th><th>Priority</th><th>Walmart Blocker</th><th>Reported</th><th>Target</th><th>Owner</th><th>Status</th></tr></thead>
+        <tbody>
+          ${sorted.map(i => `
+            <tr data-id="${i.id}">
+              <td>${i.area}</td>
+              <td>
+                <strong>${i.title}</strong><br><span style="color:var(--ink-soft);font-size:12px;">${i.detail}</span>
+                ${i.notes ? `<br><span style="color:var(--steel-dark);font-size:11.5px;font-style:italic;"><strong>Notes:</strong> ${i.notes}</span>` : ''}
+              </td>
+              <td>${i.devops || '—'}</td>
+              <td>${i.priority || '—'}</td>
+              <td>${isBlocker(i.blocker) ? `<span class="blocker-tag">${i.blocker}</span>` : (i.blocker || '—')}</td>
+              <td>${i.reportedDate ? formatDate(i.reportedDate) : '—'}</td>
+              <td>${i.targetDate ? formatDate(i.targetDate) : '—'}</td>
+              <td>${i.owner || '—'}</td>
+              <td>
+                <span class="status-pill ${i.status}">${STATUS_LABELS[i.status]}</span>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  }
+
+  function issuesByDueDate(list) {
+    const map = {};
+    list.forEach(i => {
+      if (i.targetDate) (map[i.targetDate] = map[i.targetDate] || []).push(i);
+    });
+    return map;
+  }
+
+  function renderCalendar(list) {
+    const dueMap = issuesByDueDate(list);
+    const { year, month } = calendarMonth;
+    const firstOfMonth = new Date(year, month, 1);
+    const startWeekday = firstOfMonth.getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const monthLabel = firstOfMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    const today = todayISO();
+    const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+    let cells = '';
+    for (let i = 0; i < startWeekday; i++) cells += `<div class="cal-cell empty"></div>`;
+    for (let d = 1; d <= daysInMonth; d++) {
+      const iso = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const dueIssues = dueMap[iso] || [];
+      const classes = ['cal-cell'];
+      if (dueIssues.length) classes.push('has-due');
+      if (iso === today) classes.push('is-today');
+      if (iso === selectedCalendarDate) classes.push('is-selected');
+      cells += `
+        <div class="${classes.join(' ')}" data-cal-date="${iso}">
+          <div class="cal-daynum">${d}</div>
+          ${dueIssues.length ? `<div class="cal-count">${dueIssues.length}</div>` : ''}
+        </div>`;
+    }
+    const totalCells = startWeekday + daysInMonth;
+    const trailing = (7 - (totalCells % 7)) % 7;
+    for (let i = 0; i < trailing; i++) cells += `<div class="cal-cell empty"></div>`;
+
+    const monthTotal = Object.keys(dueMap).filter(iso => iso.startsWith(`${year}-${String(month + 1).padStart(2,'0')}`)).reduce((sum, iso) => sum + dueMap[iso].length, 0);
+
+    const detailIssues = selectedCalendarDate ? (dueMap[selectedCalendarDate] || []) : [];
+    const detailHtml = selectedCalendarDate ? `
+      <div class="cal-detail">
+        <div class="cal-detail-header">Due ${formatDate(selectedCalendarDate)} <span class="count">(${detailIssues.length})</span></div>
+        <div class="cal-detail-list">
+          ${detailIssues.length ? detailIssues.map(cardHtml).join('') : '<div class="empty">No issues due this day.</div>'}
+        </div>
+      </div>` : `
+      <div class="cal-detail">
+        <div class="empty">Click a highlighted date to see what's due that day.</div>
+      </div>`;
+
+    return `
+      <div class="calendar">
+        <div class="cal-header">
+          <button type="button" class="cal-nav" id="cal-prev" aria-label="Previous month">&lsaquo;</button>
+          <div class="cal-month-label">${monthLabel}<span class="cal-month-count">${monthTotal} due this month</span></div>
+          <button type="button" class="cal-nav" id="cal-next" aria-label="Next month">&rsaquo;</button>
+        </div>
+        <div class="cal-grid cal-grid-head">${dayNames.map(n => `<div class="cal-dayname">${n}</div>`).join('')}</div>
+        <div class="cal-grid">${cells}</div>
+      </div>
+      ${detailHtml}
+    `;
+  }
+
+  function renderCompletedList(list) {
+    const completed = list.filter(i => i.status === 'completed').sort((a,b) => a.title.localeCompare(b.title));
+    if (!completed.length) return '<div class="empty">No completed issues match these filters.</div>';
+    return `
+      <div class="completed-wrap">
+        <div class="completed-header">Completed <span class="count">(${completed.length})</span></div>
+        <div class="completed-grid">${completed.map(cardHtml).join('')}</div>
+      </div>
+    `;
+  }
+
+  function render() {
+    renderStats();
+    renderHeaderSummary();
+    const list = getFiltered();
+    const body = document.getElementById('body');
+    if (currentView === 'board') body.innerHTML = renderBoard(list);
+    else if (currentView === 'table') body.innerHTML = renderTable(list);
+    else if (currentView === 'calendar') body.innerHTML = renderCalendar(list);
+    else body.innerHTML = renderCompletedList(list);
+
+    body.querySelectorAll('[data-id]').forEach(el => {
+      el.addEventListener('click', () => openModal(el.getAttribute('data-id')));
+    });
+
+    if (currentView === 'calendar') {
+      const prevBtn = document.getElementById('cal-prev');
+      const nextBtn = document.getElementById('cal-next');
+      if (prevBtn) prevBtn.addEventListener('click', () => {
+        calendarMonth.month--;
+        if (calendarMonth.month < 0) { calendarMonth.month = 11; calendarMonth.year--; }
+        render();
+      });
+      if (nextBtn) nextBtn.addEventListener('click', () => {
+        calendarMonth.month++;
+        if (calendarMonth.month > 11) { calendarMonth.month = 0; calendarMonth.year++; }
+        render();
+      });
+      body.querySelectorAll('.cal-cell.has-due').forEach(cell => {
+        cell.addEventListener('click', () => {
+          selectedCalendarDate = cell.getAttribute('data-cal-date');
+          render();
+        });
+      });
+    }
+
+    syncBoardScrollbar();
+  }
+
+  function syncBoardScrollbar() {
+    const proxy = document.getElementById('board-scrollbar-proxy');
+    const inner = document.getElementById('board-scrollbar-proxy-inner');
+    const board = currentView === 'board' ? document.querySelector('#tifton-tracker .board') : null;
+    activeBoardEl = board;
+
+    if (!board) {
+      proxy.classList.remove('visible');
+      return;
+    }
+    const overflowing = board.scrollWidth > board.clientWidth + 1;
+    if (!overflowing) {
+      proxy.classList.remove('visible');
+      return;
+    }
+    proxy.classList.add('visible');
+    inner.style.width = board.scrollWidth + 'px';
+    proxy.scrollLeft = board.scrollLeft;
+    board.addEventListener('scroll', onActiveBoardScroll);
+  }
+
+  function onActiveBoardScroll() {
+    const proxy = document.getElementById('board-scrollbar-proxy');
+    if (activeBoardEl && proxy) proxy.scrollLeft = activeBoardEl.scrollLeft;
+  }
+
+  function todayLabel() {
+    const d = new Date();
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function todayISO() {
+    const d = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }
+
+  // ---------- Export / Import ----------
+
+  function buildExportPayload() {
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      dataVersion: CURRENT_DATA_VERSION,
+      issues: issues,
+    };
+    return JSON.stringify(payload, null, 2);
+  }
+
+  function exportData() {
+    const text = buildExportPayload();
+    const stamp = new Date().toISOString().slice(0, 10);
+    const filename = `tifton-tracker-export-${stamp}.json`;
+
+    // Best-effort automatic download. Sandboxed iframes sometimes block
+    // programmatic downloads silently, so this is backed up by the modal
+    // below which always gives a guaranteed, working way to get the data.
+    let downloadAttempted = false;
+    try {
+      const blob = new Blob([text], {type: 'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      downloadAttempted = true;
+    } catch (e) {
+      downloadAttempted = false;
+    }
+
+    showExportModal(text, filename, downloadAttempted);
+  }
+
+  function showExportModal(text, filename, downloadAttempted) {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.innerHTML = `
+      <div class="modal" style="max-width:600px;">
+        <h2>Export data</h2>
+        <p style="font-size:13px;line-height:1.5;color:var(--ink-soft);margin:0 0 12px;">
+          ${downloadAttempted ? `A download (<strong>${filename}</strong>) was started automatically. ` : ''}
+          If it didn't save anywhere useful, copy the text below and save it yourself as a <strong>.json</strong> file.
+        </p>
+        <textarea id="export-textarea" readonly style="width:100%;height:260px;font-family:monospace;font-size:11.5px;padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--paper);resize:vertical;"></textarea>
+        <div class="modal-actions" style="justify-content:flex-end;gap:8px;">
+          <button class="btn-secondary" id="export-close">Close</button>
+          <button class="btn-primary" id="export-copy">Copy text</button>
+        </div>
+      </div>
+    `;
+    ROOT.appendChild(backdrop);
+    const ta = backdrop.querySelector('#export-textarea');
+    ta.value = text;
+    const close = () => backdrop.remove();
+    backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(); });
+    backdrop.querySelector('#export-close').addEventListener('click', close);
+    backdrop.querySelector('#export-copy').addEventListener('click', async (e) => {
+      const btn = e.target;
+      let ok = false;
+      try {
+        await navigator.clipboard.writeText(text);
+        ok = true;
+      } catch (err) {
+        try {
+          ta.focus();
+          ta.select();
+          ok = document.execCommand('copy');
+        } catch (err2) { ok = false; }
+      }
+      btn.textContent = ok ? 'Copied!' : 'Select text above and copy manually';
+      setTimeout(() => { btn.textContent = 'Copy text'; }, 1800);
+    });
+  }
+
+  // ---------- Custom alert/confirm (native dialogs are blocked in sandboxed iframes) ----------
+
+  function showAlertModal(message) {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.innerHTML = `
+      <div class="modal">
+        <h2>Heads up</h2>
+        <p style="font-size:13.5px;line-height:1.5;color:var(--ink-soft);margin:0 0 18px;">${message}</p>
+        <div class="modal-actions" style="justify-content:flex-end;">
+          <button class="btn-primary" id="alert-ok">OK</button>
+        </div>
+      </div>
+    `;
+    ROOT.appendChild(backdrop);
+    const close = () => backdrop.remove();
+    backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(); });
+    backdrop.querySelector('#alert-ok').addEventListener('click', close);
+  }
+
+  function openNetworkDiagramModal() {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'diagram-backdrop';
+    backdrop.innerHTML = `
+      <div class="diagram-modal">
+        <div class="diagram-modal-head">
+          <h2>How this tool is hosted and served</h2>
+          <button type="button" class="diagram-close-btn" id="diagram-close">&times;</button>
+        </div>
+        <div class="diagram-visual">
+          <svg width="100%" viewBox="0 0 680 286" role="img" aria-label="Hosting architecture diagram">
+            <title>Hosting architecture for the TIFTON Go-Live Tracker</title>
+            <desc>GitHub stores the source code and triggers a Cloudflare Worker deploy on every push. The Worker serves the site and API to the browser and reads and writes the shared issue list in a D1 database.</desc>
+            <defs>
+              <marker id="diagram-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M2 1L8 5L2 9" fill="none" stroke="#8a93a3" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </marker>
+            </defs>
+            <g>
+              <rect x="40" y="40" width="170" height="56" rx="8" fill="#f6f7f9" stroke="#d8dbe2" stroke-width="1"/>
+              <text x="125" y="58" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="600" fill="#1e2532">GitHub repo</text>
+              <text x="125" y="76" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#6b7383">Stores project code</text>
+            </g>
+            <g>
+              <rect x="270" y="40" width="210" height="56" rx="8" fill="#f6f7f9" stroke="#d8dbe2" stroke-width="1"/>
+              <text x="375" y="58" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="600" fill="#1e2532">Cloudflare Worker deploy</text>
+              <text x="375" y="76" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#6b7383">Deploys on every push</text>
+            </g>
+            <g>
+              <rect x="40" y="190" width="170" height="56" rx="8" fill="#f6f7f9" stroke="#d8dbe2" stroke-width="1"/>
+              <text x="125" y="208" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="600" fill="#1e2532">Browser</text>
+              <text x="125" y="226" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#6b7383">Loads the tracker</text>
+            </g>
+            <g>
+              <rect x="270" y="190" width="210" height="56" rx="8" fill="#e9f5ee" stroke="#c8e6d5" stroke-width="1"/>
+              <text x="375" y="208" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="600" fill="#3a6b52">Cloudflare Worker</text>
+              <text x="375" y="226" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#3a6b52">Password gate + site + API</text>
+            </g>
+            <g>
+              <rect x="505" y="190" width="125" height="56" rx="8" fill="#f2ecfb" stroke="#ddccf2" stroke-width="1"/>
+              <text x="567" y="208" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="600" fill="#6b4fa0">D1 database</text>
+              <text x="567" y="226" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#6b4fa0">Shared issue list</text>
+            </g>
+            <line x1="210" y1="68" x2="268" y2="68" stroke="#8a93a3" stroke-width="1.5" marker-end="url(#diagram-arrow)"/>
+            <line x1="375" y1="96" x2="375" y2="188" stroke="#8a93a3" stroke-width="1.5" marker-end="url(#diagram-arrow)"/>
+            <line x1="210" y1="218" x2="268" y2="218" stroke="#8a93a3" stroke-width="1.5" marker-end="url(#diagram-arrow)"/>
+            <line x1="480" y1="218" x2="503" y2="218" stroke="#8a93a3" stroke-width="1.5" marker-end="url(#diagram-arrow)"/>
+          </svg>
+          <div class="diagram-caption">A push to GitHub triggers a fresh Cloudflare Worker deploy (top row — deploy time). Your browser talks to that running Worker, which checks your password/session, serves the tracker's HTML/JS, and reads and writes the shared issue list in the D1 database (bottom row — request time).</div>
+        </div>
+        <div class="diagram-security">
+          <div class="diagram-security-title">How the password protection works</div>
+          <p class="diagram-security-text">Every request — including the API calls this tracker makes to load and save data — is checked by this Worker before anything is served. That check happens on the server, so it can't be bypassed by viewing page source the way a password built into client-side JavaScript could be.</p>
+          <p class="diagram-security-text">The password itself is stored as a Cloudflare secret and never appears anywhere in the code or this repository.</p>
+          <p class="diagram-security-text">A correct password sets a session cookie (HttpOnly, Secure, SameSite=Lax) whose value is an expiry timestamp plus an HMAC-SHA256 signature of that timestamp, generated using a separate signing secret. The Worker verifies this signature using a constant-time comparison (to avoid leaking timing information) and checks the expiry on every request, keeping you signed in for 30 days without re-entering the password.</p>
+          <p class="diagram-security-text">This is a single shared password for anyone who has it — there are no individual user accounts and no log of who signed in.</p>
+          <p class="diagram-security-text">The D1 database itself is not exposed to the internet directly — it's only reachable through the Worker's own code via a private binding, encrypted at rest by Cloudflare, and isolated to this Cloudflare account.</p>
+        </div>
+      </div>
+    `;
+    ROOT.appendChild(backdrop);
+    const close = () => backdrop.remove();
+    backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(); });
+    backdrop.querySelector('#diagram-close').addEventListener('click', close);
+  }
+
+  function parseAndValidateImport(text) {
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch (e) {
+      return { error: 'That doesn\'t look like valid JSON — check for missing commas, brackets, or quotes.' };
+    }
+    const incoming = Array.isArray(parsed) ? parsed : parsed.issues;
+    if (!Array.isArray(incoming)) {
+      return { error: 'This JSON doesn\'t look like a tracker export (expected an array of issues, or an object with an "issues" array).' };
+    }
+    const looksValid = incoming.every(i => i && typeof i === 'object' && 'id' in i && 'title' in i);
+    if (!looksValid) {
+      return { error: 'This JSON doesn\'t look like a tracker export — some entries are missing expected fields (id, title).' };
+    }
+    return { issues: incoming };
+  }
+
+  function openImportModal() {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.innerHTML = `
+      <div class="modal" style="max-width:600px;">
+        <h2>Import data</h2>
+        <p style="font-size:13px;line-height:1.5;color:var(--ink-soft);margin:0 0 10px;">
+          Choose a previously exported .json file, or paste its contents directly below.
+        </p>
+        <div class="field">
+          <label>Choose file</label>
+          <input type="file" id="import-modal-file" accept="application/json,.json">
+        </div>
+        <div class="field">
+          <label>Or paste JSON here</label>
+          <textarea id="import-modal-textarea" placeholder="Paste exported JSON here..." style="width:100%;height:200px;font-family:monospace;font-size:11.5px;padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--paper);resize:vertical;"></textarea>
+        </div>
+        <p id="import-modal-error" style="font-size:12.5px;color:var(--rust);margin:0 0 8px;display:none;"></p>
+        <div class="modal-actions" style="justify-content:flex-end;gap:8px;">
+          <button class="btn-secondary" id="import-cancel">Cancel</button>
+          <button class="btn-primary" id="import-load">Import</button>
+        </div>
+      </div>
+    `;
+    ROOT.appendChild(backdrop);
+    const close = () => backdrop.remove();
+    backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(); });
+    backdrop.querySelector('#import-cancel').addEventListener('click', close);
+
+    const fileInput = backdrop.querySelector('#import-modal-file');
+    const textarea = backdrop.querySelector('#import-modal-textarea');
+    const errorEl = backdrop.querySelector('#import-modal-error');
+
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => { textarea.value = reader.result; };
+      reader.onerror = () => {
+        errorEl.textContent = 'Could not read that file — try pasting its contents into the box below instead.';
+        errorEl.style.display = 'block';
+      };
+      reader.readAsText(file);
+    });
+
+    backdrop.querySelector('#import-load').addEventListener('click', () => {
+      const text = textarea.value.trim();
+      if (!text) {
+        errorEl.textContent = 'Choose a file above or paste JSON text before importing.';
+        errorEl.style.display = 'block';
+        return;
+      }
+      const result = parseAndValidateImport(text);
+      if (result.error) {
+        errorEl.textContent = result.error;
+        errorEl.style.display = 'block';
+        return;
+      }
+      close();
+      showConfirmModal(
+        `Import ${result.issues.length} issue(s)? This will replace all ${issues.length} issue(s) currently in the tracker.`,
+        async () => {
+          issues = result.issues;
+          migrateRemovedStatuses();
+          await saveIssues();
+          populateFilters();
+          render();
+        }
+      );
+    });
+  }
+
+  function showConfirmModal(message, onConfirm) {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.innerHTML = `
+      <div class="modal">
+        <h2>Please confirm</h2>
+        <p style="font-size:13.5px;line-height:1.5;color:var(--ink-soft);margin:0 0 18px;">${message}</p>
+        <div class="modal-actions" style="justify-content:flex-end;gap:8px;">
+          <button class="btn-secondary" id="confirm-cancel">Cancel</button>
+          <button class="btn-primary" id="confirm-ok">Import</button>
+        </div>
+      </div>
+    `;
+    ROOT.appendChild(backdrop);
+    const close = () => backdrop.remove();
+    backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(); });
+    backdrop.querySelector('#confirm-cancel').addEventListener('click', close);
+    backdrop.querySelector('#confirm-ok').addEventListener('click', () => {
+      close();
+      onConfirm();
+    });
+  }
+
+  // ---------- Copy view ----------
+
+  function statusText(status) {
+    return STATUS_LABELS[status] || status;
+  }
+
+  function buildCopyText() {
+    const list = getFiltered();
+    const header = `TIFTON GO-LIVE TRACKER\nGenerated ${todayLabel()}\n${list.length} issue(s)\n`;
+
+    if (!list.length) return header + '\nNo issues match the current filters.';
+
+    if (currentView === 'table') {
+      const rows = list.slice().sort((a,b) => {
+        const statusDiff = STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status);
+        return statusDiff !== 0 ? statusDiff : a.title.localeCompare(b.title);
+      }).map(i => {
+        return [i.area, i.title, i.detail, i.devops || '\u2014', i.priority || '\u2014', i.blocker || '\u2014', i.reportedDate ? formatDate(i.reportedDate) : '\u2014', i.targetDate ? formatDate(i.targetDate) : '\u2014', i.notes || '\u2014', i.owner || '\u2014', statusText(i.status)].join('\t');
+      });
+      const cols = ['Area', 'Title', 'Detail', 'DevOps #', 'Priority', 'Walmart Blocker', 'Reported', 'Target', 'Notes', 'Owner', 'Status'].join('\t');
+      return header + '\n' + cols + '\n' + rows.join('\n');
+    }
+
+    // board view (grouped by status)
+    const blocks = STATUS_ORDER.map(st => {
+      const items = list.filter(i => i.status === st);
+      if (!items.length) return null;
+      const lines = items.map(i => formatIssueLine(i));
+      return `${statusText(st).toUpperCase()} (${items.length})\n${'-'.repeat(30)}\n${lines.join('\n\n')}`;
+    }).filter(Boolean);
+    return header + '\n' + blocks.join('\n\n\n');
+  }
+
+  function formatIssueLine(i) {
+    const owner = i.owner ? `  |  ${i.owner}` : '';
+    const devops = i.devops ? `  |  DevOps #${i.devops}` : '';
+    const priority = i.priority ? `  |  ${i.priority} priority` : '';
+    const blocker = isBlocker(i.blocker) ? `  |  WALMART BLOCKER${i.blocker === 'Y/N' ? ' (Y/N)' : ''}` : '';
+    const reported = i.reportedDate ? `  |  Reported: ${formatDate(i.reportedDate)}` : '';
+    const target = i.targetDate ? `  |  Target: ${formatDate(i.targetDate)}` : '';
+    const notes = i.notes ? `\nNotes: ${i.notes}` : '';
+    return `[${i.area}]${devops} ${i.title}\n${i.detail}${owner}${priority}${blocker}${reported}${target}${notes}`;
+  }
+
+  // Colors mirrored from the app's CSS variables, hardcoded here since inline
+  // styles are required for HTML pasted into external email clients.
+  const EMAIL_COLORS = {
+    ink: '#1b2027', inkSoft: '#565f6c', line: '#dcd8cc',
+    steel: '#3d5a73', steelBg: '#e4ebef',
+    amber: '#c4791f', amberBg: '#fbeee0',
+    rust: '#a3402f', rustBg: '#f8e6e1',
+    moss: '#4a6b4d', mossBg: '#e7efe4',
+    slate: '#6b7280', slateBg: '#eceae2',
+    teal: '#1f7a72', tealBg: '#daf0ee',
+  };
+  const STATUS_EMAIL_COLOR = { open: 'rust', inprogress: 'amber', testing: 'steel', readyinstall: 'slate', readycustomer: 'moss', completed: 'teal' };
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function escNl(s) {
+    return esc(s).replace(/\n/g, '<br>');
+  }
+
+  function priorityEmailColor(p) {
+    if (p === 'High') return 'rust';
+    if (p === 'Medium') return 'amber';
+    if (p === 'Low') return 'slate';
+    return null;
+  }
+
+  function chip(text, colorKey) {
+    const c = EMAIL_COLORS[colorKey], bg = EMAIL_COLORS[colorKey + 'Bg'];
+    return `<span style="display:inline-block;font-size:11px;font-weight:600;color:${c};background:${bg};border-radius:4px;padding:2px 7px;margin:0 6px 4px 0;white-space:nowrap;">${esc(text)}</span>`;
+  }
+
+  function issueMetaHtml(i) {
+    const chips = [];
+    if (i.devops) chips.push(chip('DevOps #' + i.devops, 'steel'));
+    if (i.priority) { const pc = priorityEmailColor(i.priority); if (pc) chips.push(chip(i.priority + ' priority', pc)); }
+    if (isBlocker(i.blocker)) chips.push(chip('WALMART BLOCKER' + (i.blocker === 'Y/N' ? ' (Y/N)' : ''), 'rust'));
+    if (i.reportedDate) chips.push(chip('Reported: ' + formatDate(i.reportedDate), 'slate'));
+    if (i.targetDate) chips.push(chip('Target: ' + formatDate(i.targetDate), 'slate'));
+    return chips.join('');
+  }
+
+  function buildCopyHtml() {
+    const list = getFiltered();
+    const font = "font-family:Arial,Helvetica,sans-serif;";
+    const headerHtml = `
+      <div style="${font}margin-bottom:14px;">
+        <div style="font-size:17px;font-weight:700;color:${EMAIL_COLORS.ink};">TIFTON Go-Live Tracker</div>
+        <div style="font-size:12px;color:${EMAIL_COLORS.inkSoft};">Generated ${esc(todayLabel())} &middot; ${list.length} issue(s)</div>
+      </div>`;
+
+    if (!list.length) {
+      return `<div style="${font}">${headerHtml}<p style="color:${EMAIL_COLORS.inkSoft};">No issues match the current filters.</p></div>`;
+    }
+
+    if (currentView === 'table') {
+      const sorted = list.slice().sort((a,b) => {
+        const statusDiff = STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status);
+        return statusDiff !== 0 ? statusDiff : a.title.localeCompare(b.title);
+      });
+      const th = (label) => `<th style="text-align:left;padding:6px 10px;border-bottom:2px solid ${EMAIL_COLORS.ink};font-size:11px;text-transform:uppercase;letter-spacing:0.03em;color:${EMAIL_COLORS.inkSoft};">${esc(label)}</th>`;
+      const rowsHtml = sorted.map(i => {
+        const statusColor = EMAIL_COLORS[STATUS_EMAIL_COLOR[i.status]];
+        const statusBg = EMAIL_COLORS[STATUS_EMAIL_COLOR[i.status] + 'Bg'];
+        return `
+          <tr>
+            <td style="padding:8px 10px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;font-size:12.5px;">${esc(i.area)}</td>
+            <td style="padding:8px 10px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;">
+              <div style="font-weight:700;font-size:13px;color:${EMAIL_COLORS.ink};">${esc(i.title)}</div>
+              <div style="font-size:12px;color:${EMAIL_COLORS.inkSoft};margin-top:2px;">${escNl(i.detail)}</div>
+              ${i.notes ? `<div style="font-size:11.5px;color:${EMAIL_COLORS.steel};font-style:italic;margin-top:4px;"><strong>Notes:</strong> ${escNl(i.notes)}</div>` : ''}
+            </td>
+            <td style="padding:8px 10px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;font-size:12.5px;">${esc(i.devops) || '&mdash;'}</td>
+            <td style="padding:8px 10px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;font-size:12.5px;">${esc(i.priority) || '&mdash;'}</td>
+            <td style="padding:8px 10px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;font-size:12.5px;${isBlocker(i.blocker) ? `color:${EMAIL_COLORS.rust};font-weight:700;` : ''}">${isBlocker(i.blocker) ? 'YES' + (i.blocker === 'Y/N' ? ' (Y/N)' : '') : (esc(i.blocker) || '&mdash;')}</td>
+            <td style="padding:8px 10px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;font-size:12.5px;">${i.reportedDate ? esc(formatDate(i.reportedDate)) : '&mdash;'}</td>
+            <td style="padding:8px 10px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;font-size:12.5px;">${i.targetDate ? esc(formatDate(i.targetDate)) : '&mdash;'}</td>
+            <td style="padding:8px 10px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;font-size:12.5px;">${esc(i.owner) || '&mdash;'}</td>
+            <td style="padding:8px 10px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;">
+              <span style="display:inline-block;font-size:11px;font-weight:700;color:${statusColor};background:${statusBg};border-radius:100px;padding:3px 10px;white-space:nowrap;">${esc(STATUS_LABELS[i.status])}</span>
+            </td>
+          </tr>`;
+      }).join('');
+      return `
+        <div style="${font}">
+          ${headerHtml}
+          <table style="border-collapse:collapse;width:100%;">
+            <thead><tr>${th('Area')}${th('Issue')}${th('DevOps #')}${th('Priority')}${th('Walmart Blocker')}${th('Reported')}${th('Target')}${th('Owner')}${th('Status')}</tr></thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        </div>`;
+    }
+
+    // board view (grouped by status) -> a labeled table per status group
+    const sections = STATUS_ORDER.map(st => {
+      const items = list.filter(i => i.status === st);
+      if (!items.length) return '';
+      const color = EMAIL_COLORS[STATUS_EMAIL_COLOR[st]];
+      const rowsHtml = items.map(i => `
+        <tr>
+          <td style="padding:10px 12px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;width:120px;font-size:12.5px;color:${EMAIL_COLORS.inkSoft};">${esc(i.area)}</td>
+          <td style="padding:10px 12px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;">
+            <div style="font-weight:700;font-size:13.5px;color:${EMAIL_COLORS.ink};">${esc(i.title)}</div>
+            <div style="margin:4px 0;">${issueMetaHtml(i)}</div>
+            <div style="font-size:12px;color:${EMAIL_COLORS.inkSoft};">${escNl(i.detail)}</div>
+            ${i.notes ? `<div style="font-size:11.5px;color:${EMAIL_COLORS.steel};font-style:italic;margin-top:4px;">${escNl(i.notes)}</div>` : ''}
+            ${i.owner ? `<div style="font-size:11.5px;font-weight:700;color:${EMAIL_COLORS.steel};margin-top:6px;">${esc(i.owner)}</div>` : ''}
+          </td>
+        </tr>`).join('');
+      return `
+        <div style="margin-bottom:20px;">
+          <div style="font-size:14px;font-weight:700;color:${color};border-bottom:2px solid ${color};padding-bottom:4px;margin-bottom:8px;">
+            ${esc(STATUS_LABELS[st])} <span style="font-weight:400;color:${EMAIL_COLORS.inkSoft};">(${items.length})</span>
+          </div>
+          <table style="border-collapse:collapse;width:100%;">
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        </div>`;
+    }).filter(Boolean).join('');
+
+    return `<div style="${font}">${headerHtml}${sections}</div>`;
+  }
+
+  // Copies rich HTML by rendering it off-screen, selecting it as a real DOM
+  // range, and using the classic execCommand('copy'). Unlike the modern async
+  // Clipboard API (which some sandboxed hosts silently refuse for anything
+  // beyond plain text), this selection-based copy is what browsers have used
+  // for rich copy/paste for years and reliably places BOTH an HTML and a
+  // plain-text representation on the clipboard in one step.
+  function copyRichViaSelection(html, text) {
+    const container = document.createElement('div');
+    container.setAttribute('contenteditable', 'true');
+    container.style.position = 'fixed';
+    container.style.top = '0';
+    container.style.left = '0';
+    container.style.opacity = '0.01';
+    container.style.pointerEvents = 'none';
+    container.style.zIndex = '-1';
+    container.innerHTML = html;
+    document.body.appendChild(container);
+
+    let ok = false;
+    try {
+      const range = document.createRange();
+      range.selectNodeContents(container);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      ok = document.execCommand('copy');
+      sel.removeAllRanges();
+    } catch (e) {
+      ok = false;
+    }
+    container.remove();
+    return ok;
+  }
+
+  async function copyCurrentView() {
+    const text = buildCopyText();
+    const html = buildCopyHtml();
+    const btn = document.getElementById('btn-copy-view');
+    let ok = copyRichViaSelection(html, text);
+
+    if (!ok) {
+      // Fall back to the modern Clipboard API with both MIME types
+      try {
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            'text/plain': new Blob([text], { type: 'text/plain' }),
+            'text/html': new Blob([html], { type: 'text/html' }),
+          })
+        ]);
+        ok = true;
+      } catch (e) {
+        // Fall back further to plain-text-only clipboard write
+        try {
+          await navigator.clipboard.writeText(text);
+          ok = true;
+        } catch (e2) {
+          // Final fallback for environments where the Clipboard API is unavailable/blocked
+          try {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.focus();
+            ta.select();
+            ok = document.execCommand('copy');
+            ta.remove();
+          } catch (e3) {
+            ok = false;
+          }
+        }
+      }
+    }
+    const original = btn.textContent;
+    btn.textContent = ok ? 'Copied!' : 'Copy failed';
+    btn.classList.toggle('copied', ok);
+    setTimeout(() => {
+      btn.textContent = original;
+      btn.classList.remove('copied');
+    }, 1600);
+  }
+
+  function openModal(id) {
+    editingId = id || null;
+    const issue = id ? issues.find(i => i.id === id) : { area:'', title:'', detail:'', status: STATUS_ORDER[0], owner:'', devops:'', priority:'', blocker:'', targetDate:'', notes:'', reportedDate: todayISO() };
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.innerHTML = `
+      <div class="modal">
+        <h2>${id ? 'Edit issue' : 'Add issue'}</h2>
+        <div class="field-row">
+          <div class="field"><label>Area</label><input type="text" id="m-area" value="${issue.area}" placeholder="e.g. Exotec, Packing"></div>
+          <div class="field"><label>Owner</label><input type="text" id="m-owner" value="${issue.owner||''}" placeholder="optional"></div>
+        </div>
+        <div class="field"><label>Title</label><input type="text" id="m-title" value="${issue.title}" placeholder="Short summary"></div>
+        <div class="field"><label>Detail</label><textarea id="m-detail" placeholder="Full description">${issue.detail}</textarea></div>
+        <div class="field-row">
+          <div class="field"><label>DevOps #</label><input type="text" id="m-devops" value="${issue.devops||''}" placeholder="e.g. 24714 (optional)"></div>
+          <div class="field">
+            <label>Priority</label>
+            <select id="m-priority">
+              <option value="" ${!issue.priority ? 'selected' : ''}>&mdash;</option>
+              <option value="High" ${issue.priority==='High'?'selected':''}>High</option>
+              <option value="Medium" ${issue.priority==='Medium'?'selected':''}>Medium</option>
+              <option value="Low" ${issue.priority==='Low'?'selected':''}>Low</option>
+            </select>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Reported date</label><input type="date" id="m-reported" value="${issue.reportedDate||''}"></div>
+          <div class="field"><label>Target completion date</label><input type="date" id="m-target" value="${issue.targetDate||''}"></div>
+        </div>
+        <div class="field">
+          <label>Walmart blocker</label>
+          <select id="m-blocker">
+            <option value="" ${!issue.blocker ? 'selected' : ''}>&mdash;</option>
+            <option value="Y" ${issue.blocker==='Y'?'selected':''}>Y</option>
+            <option value="N" ${issue.blocker==='N'?'selected':''}>N</option>
+            <option value="Y/N" ${issue.blocker==='Y/N'?'selected':''}>Y/N (unclear)</option>
+          </select>
+        </div>
+        <div class="field"><label>Notes</label><textarea id="m-notes" placeholder="optional">${issue.notes||''}</textarea></div>
+        <div class="field">
+          <label>Status</label>
+          <select id="m-status">
+            ${STATUS_ORDER.map(s => `<option value="${s}" ${issue.status===s?'selected':''}>${STATUS_LABELS[s]}</option>`).join('')}
+          </select>
+        </div>
+        <div class="modal-actions">
+          <div>${id ? '<button class="btn-delete" id="m-delete">Delete</button>' : ''}</div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn-secondary" id="m-cancel">Cancel</button>
+            <button class="btn-primary" id="m-save">Save</button>
+          </div>
+        </div>
+      </div>
+    `;
+    ROOT.appendChild(backdrop);
+
+    backdrop.addEventListener('click', (e) => { if (e.target === backdrop) backdrop.remove(); });
+    document.getElementById('m-cancel').addEventListener('click', () => backdrop.remove());
+    if (id) {
+      document.getElementById('m-delete').addEventListener('click', async () => {
+        issues = issues.filter(i => i.id !== id);
+        await saveIssues();
+        backdrop.remove();
+        populateFilters();
+        render();
+      });
+    }
+    document.getElementById('m-save').addEventListener('click', async () => {
+      const data = {
+        area: document.getElementById('m-area').value.trim() || 'General',
+        title: document.getElementById('m-title').value.trim(),
+        detail: document.getElementById('m-detail').value.trim(),
+        status: document.getElementById('m-status').value,
+        owner: document.getElementById('m-owner').value.trim(),
+        devops: document.getElementById('m-devops').value.trim(),
+        priority: document.getElementById('m-priority').value,
+        blocker: document.getElementById('m-blocker').value,
+        reportedDate: document.getElementById('m-reported').value,
+        targetDate: document.getElementById('m-target').value,
+        notes: document.getElementById('m-notes').value.trim(),
+      };
+      if (!data.title) { document.getElementById('m-title').focus(); return; }
+      if (id) {
+        const idx = issues.findIndex(i => i.id === id);
+        issues[idx] = { ...issues[idx], ...data };
+      } else {
+        data.id = 'issue-' + Date.now();
+        issues.push(data);
+      }
+      await saveIssues();
+      backdrop.remove();
+      populateFilters();
+      render();
+    });
+  }
+
+  // Event bindings
+  document.getElementById('btn-add').addEventListener('click', () => openModal(null));
+  document.getElementById('btn-copy-view').addEventListener('click', copyCurrentView);
+  document.getElementById('btn-export').addEventListener('click', exportData);
+  document.getElementById('btn-network-diagram').addEventListener('click', openNetworkDiagramModal);
+  document.getElementById('btn-import').addEventListener('click', openImportModal);
+  document.getElementById('filter-area').addEventListener('change', render);
+  document.getElementById('filter-status').addEventListener('change', render);
+  document.getElementById('filter-blocker').addEventListener('change', render);
+  document.getElementById('filter-missing').addEventListener('change', render);
+  document.getElementById('search').addEventListener('input', render);
+  document.querySelectorAll('#view-toggle button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentView = btn.getAttribute('data-view');
+      document.querySelectorAll('#view-toggle button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      render();
+    });
+  });
+
+  document.getElementById('board-scrollbar-proxy').addEventListener('scroll', (e) => {
+    if (activeBoardEl) activeBoardEl.scrollLeft = e.target.scrollLeft;
+  });
+  window.addEventListener('resize', () => {
+    if (currentView === 'board') syncBoardScrollbar();
+  });
+
+  (async function init() {
+    await loadIssues();
+    populateFilters();
+    render();
+  })();
+})();
+</script>
+
+</body>
+</html>
