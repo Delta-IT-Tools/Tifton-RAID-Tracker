@@ -579,7 +579,7 @@
   <div class="board-scrollbar-proxy" id="board-scrollbar-proxy">
     <div class="board-scrollbar-proxy-inner" id="board-scrollbar-proxy-inner"></div>
   </div>
-  <div class="save-note" id="save-note">Saved to your browser &middot; personal to you</div>
+  <div class="save-note" id="save-note">Loading&hellip;</div>
   <div class="data-io">
     <button class="btn-io" id="btn-export">Export JSON</button>
     <button class="btn-io" id="btn-import">Import JSON</button>
@@ -590,8 +590,6 @@
 <script>
 (function() {
   const ROOT = document.getElementById('tifton-tracker');
-  const STORAGE_KEY = 'tifton-tracker:issues';
-  const VERSION_KEY = 'tifton-tracker:data-version';
   const CURRENT_DATA_VERSION = 7; // bump this whenever the seed data below should replace what's saved
 
   const SEED_ISSUES = [
@@ -674,30 +672,27 @@
   let activeBoardEl = null;
 
   async function loadIssues() {
-    let storedVersion = 0;
     try {
-      const vResult = await window.storage.get(VERSION_KEY, false);
-      if (vResult && vResult.value) storedVersion = parseInt(vResult.value) || 0;
-    } catch (e) { /* no version stored yet */ }
+      const res = await fetch('/api/issues');
+      if (!res.ok) throw new Error('Failed to load issues: ' + res.status);
+      const payload = await res.json();
+      const storedVersion = payload.dataVersion || 0;
 
-    if (storedVersion < CURRENT_DATA_VERSION) {
-      // Fresh dataset supersedes whatever was previously saved in this browser.
-      issues = SEED_ISSUES.slice();
-      await saveIssues();
-      try { await window.storage.set(VERSION_KEY, String(CURRENT_DATA_VERSION), false); } catch (e) {}
-      return;
-    }
-
-    try {
-      const result = await window.storage.get(STORAGE_KEY, false);
-      if (result && result.value) {
-        issues = JSON.parse(result.value);
-        migrateRemovedStatuses();
+      if (storedVersion < CURRENT_DATA_VERSION) {
+        // Fresh dataset supersedes whatever was previously saved.
+        issues = SEED_ISSUES.slice();
+        await saveIssues();
         return;
       }
-    } catch (e) { /* not found yet */ }
-    issues = SEED_ISSUES.slice();
-    await saveIssues();
+
+      issues = Array.isArray(payload.issues) ? payload.issues : [];
+      migrateRemovedStatuses();
+    } catch (e) {
+      console.error('Load error', e);
+      issues = SEED_ISSUES.slice();
+      const noteEl = document.getElementById('save-note');
+      if (noteEl) { noteEl.textContent = 'Could not reach the database — showing default data'; }
+    }
   }
 
   // Fixes up any saved issues still carrying a status value that no longer exists
@@ -716,8 +711,13 @@
   async function saveIssues() {
     const noteEl = document.getElementById('save-note');
     try {
-      await window.storage.set(STORAGE_KEY, JSON.stringify(issues), false);
-      if (noteEl) { noteEl.textContent = 'Saved to your browser · personal to you'; }
+      const res = await fetch('/api/issues', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ issues, dataVersion: CURRENT_DATA_VERSION }),
+      });
+      if (!res.ok) throw new Error('Save failed: ' + res.status);
+      if (noteEl) { noteEl.textContent = 'Saved · shared with everyone using this tracker'; }
     } catch (e) {
       if (noteEl) { noteEl.textContent = 'Could not save — changes may not persist'; }
       console.error('Storage error', e);
