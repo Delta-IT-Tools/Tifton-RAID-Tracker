@@ -57,6 +57,19 @@ export default {
       return new Response("Method not allowed", { status: 405 });
     }
 
+    if (url.pathname === "/api/snapshots") {
+      if (request.method === "GET") return handleGetSnapshots(env);
+      if (request.method === "POST") return handlePostSnapshot(request, env);
+      return new Response("Method not allowed", { status: 405 });
+    }
+
+    if (url.pathname.startsWith("/api/snapshots/")) {
+      const id = url.pathname.slice("/api/snapshots/".length);
+      if (request.method === "GET") return handleGetSnapshotDetail(env, id);
+      if (request.method === "DELETE") return handleDeleteSnapshot(env, id);
+      return new Response("Method not allowed", { status: 405 });
+    }
+
     // Authenticated — serve the static tracker (public/index.html, etc).
     // The response's Content-Type header is what actually controls how the
     // browser decodes the bytes — the <meta charset="UTF-8"> tag in the
@@ -267,6 +280,8 @@ function renderLoginPage(showError) {
 
 // ---------- Shared issue-list API (same logic as functions/api/issues.js) ----------
 
+const META_ROW_ID = "meta";
+
 async function handleGetIssues(env) {
   if (!env.DB) {
     return jsonResponse({ error: "D1 database not bound. See README.md." }, 500);
@@ -277,8 +292,17 @@ async function handleGetIssues(env) {
       .bind(ROW_ID)
       .first();
 
+    let asOfDate = null;
+    try {
+      const metaRow = await env.DB
+        .prepare("SELECT data FROM tracker_data WHERE id = ?")
+        .bind(META_ROW_ID)
+        .first();
+      if (metaRow) asOfDate = JSON.parse(metaRow.data).asOfDate || null;
+    } catch (e) { /* no meta row yet, or corrupted — just omit asOfDate */ }
+
     if (!row) {
-      return jsonResponse({ issues: [], dataVersion: 0 });
+      return jsonResponse({ issues: [], dataVersion: 0, asOfDate });
     }
 
     let issues;
@@ -288,7 +312,7 @@ async function handleGetIssues(env) {
       return jsonResponse({ error: "Stored data is corrupted JSON." }, 500);
     }
 
-    return jsonResponse({ issues, dataVersion: row.data_version || 0 });
+    return jsonResponse({ issues, dataVersion: row.data_version || 0, asOfDate });
   } catch (e) {
     return jsonResponse({ error: "Database read failed: " + e.message }, 500);
   }
@@ -326,6 +350,23 @@ async function handlePutIssues(request, env) {
       .bind(ROW_ID, JSON.stringify(payload.issues), dataVersion, now)
       .run();
 
+    // Only updates the "as of" date when the client explicitly supplies one
+    // (i.e. a live RAID Log upload) — manual single-issue edits don't touch
+    // this, since it's meant to reflect "when was this last bulk-uploaded
+    // from Excel", not every small tweak.
+    if (payload.asOfDate) {
+      await env.DB
+        .prepare(
+          `INSERT INTO tracker_data (id, data, data_version, updated_at)
+           VALUES (?, ?, 0, ?)
+           ON CONFLICT(id) DO UPDATE SET
+             data = excluded.data,
+             updated_at = excluded.updated_at`
+        )
+        .bind(META_ROW_ID, JSON.stringify({ asOfDate: payload.asOfDate }), now)
+        .run();
+    }
+
     return jsonResponse({ ok: true, updatedAt: now });
   } catch (e) {
     return jsonResponse({ error: "Database write failed: " + e.message }, 500);
@@ -337,4 +378,121 @@ function jsonResponse(obj, status) {
     status: status || 200,
     headers: { "Content-Type": "application/json" },
   });
+}
+
+// ---------- Upload history / snapshots ----------
+//
+// Every time a new RAID log is uploaded through the "Upload RAID Log"
+// button, the client POSTs the resulting item list here. We store the
+// full item-level state at that moment (not just counts) so later
+// analysis — e.g. how long a given item has sat in "Testing" — can be
+// computed by comparing snapshots over time, not just looking at today.
+
+async function handleGetSnapshots(env) {
+  if (!env.DB) {
+    return jsonResponse({ error: "D1 database not bound. See README.md." }, 500);
+  }
+  try {
+    const { results } = await env.DB
+      .prepare("SELECT id, uploaded_at, item_count, status_counts FROM raid_snapshots ORDER BY uploaded_at DESC LIMIT 100")
+      .all();
+    const snapshots = (results || []).map((r) => ({
+      id: r.id,
+      uploadedAt: r.uploaded_at,
+      itemCount: r.item_count,
+      statusCounts: JSON.parse(r.status_counts),
+    }));
+    return jsonResponse({ snapshots });
+  } catch (e) {
+    return jsonResponse({ error: "Database read failed: " + e.message }, 500);
+  }
+}
+
+async function handleGetSnapshotDetail(env, id) {
+  if (!env.DB) {
+    return jsonResponse({ error: "D1 database not bound. See README.md." }, 500);
+  }
+  const numericId = parseInt(id, 10);
+  if (Number.isNaN(numericId)) {
+    return jsonResponse({ error: "Invalid snapshot id." }, 400);
+  }
+  try {
+    const row = await env.DB
+      .prepare("SELECT id, uploaded_at, item_count, status_counts, data FROM raid_snapshots WHERE id = ?")
+      .bind(numericId)
+      .first();
+    if (!row) {
+      return jsonResponse({ error: "Snapshot not found." }, 404);
+    }
+    return jsonResponse({
+      id: row.id,
+      uploadedAt: row.uploaded_at,
+      itemCount: row.item_count,
+      statusCounts: JSON.parse(row.status_counts),
+      issues: JSON.parse(row.data),
+    });
+  } catch (e) {
+    return jsonResponse({ error: "Database read failed: " + e.message }, 500);
+  }
+}
+
+async function handleDeleteSnapshot(env, id) {
+  if (!env.DB) {
+    return jsonResponse({ error: "D1 database not bound. See README.md." }, 500);
+  }
+  const numericId = parseInt(id, 10);
+  if (Number.isNaN(numericId)) {
+    return jsonResponse({ error: "Invalid snapshot id." }, 400);
+  }
+  try {
+    await env.DB.prepare("DELETE FROM raid_snapshots WHERE id = ?").bind(numericId).run();
+    return jsonResponse({ ok: true });
+  } catch (e) {
+    return jsonResponse({ error: "Database delete failed: " + e.message }, 500);
+  }
+}
+
+async function handlePostSnapshot(request, env) {
+  if (!env.DB) {
+    return jsonResponse({ error: "D1 database not bound. See README.md." }, 500);
+  }
+  let payload;
+  try {
+    payload = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: "Request body is not valid JSON." }, 400);
+  }
+  if (!Array.isArray(payload.issues)) {
+    return jsonResponse({ error: "Expected { issues: [...] }." }, 400);
+  }
+
+  const statusCounts = {};
+  payload.issues.forEach((i) => {
+    const s = i.status || "unknown";
+    statusCounts[s] = (statusCounts[s] || 0) + 1;
+  });
+
+  // Allows backdating a snapshot to when that RAID log export actually was
+  // (e.g. uploading a historical copy from weeks ago), so History reflects
+  // the real timeline rather than just upload order. Falls back to now if
+  // the client doesn't supply a date, or supplies an unparseable one.
+  let uploadedAt = new Date().toISOString();
+  if (payload.uploadedAt) {
+    const parsed = new Date(payload.uploadedAt);
+    if (!isNaN(parsed)) uploadedAt = parsed.toISOString();
+  }
+
+  try {
+    const result = await env.DB
+      .prepare(
+        `INSERT INTO raid_snapshots (uploaded_at, item_count, status_counts, data)
+         VALUES (?, ?, ?, ?)`
+      )
+      .bind(uploadedAt, payload.issues.length, JSON.stringify(statusCounts), JSON.stringify(payload.issues))
+      .run();
+
+    return jsonResponse({ ok: true, id: result.meta.last_row_id, uploadedAt });
+  } catch (e) {
+    return jsonResponse({ error: "Database write failed: " + e.message }, 500);
+  }
 }

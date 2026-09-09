@@ -15,3 +15,19 @@ CREATE TABLE IF NOT EXISTS tracker_data (
   data_version INTEGER NOT NULL DEFAULT 0,
   updated_at TEXT NOT NULL
 );
+
+-- Records a full snapshot every time a new RAID log is uploaded via the
+-- "Upload RAID Log" button. status_counts is a small JSON summary
+-- (e.g. {"open":40,"closed":12,...}) for quick display in the History
+-- view without needing to load the full item list; data is the complete
+-- item-level snapshot at that moment, kept so trend/duration analysis
+-- (e.g. "how long has item #128 been in Testing") can be computed later
+-- by comparing snapshots, not just the current totals.
+
+CREATE TABLE IF NOT EXISTS raid_snapshots (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  uploaded_at TEXT NOT NULL,
+  item_count INTEGER NOT NULL,
+  status_counts TEXT NOT NULL,
+  data TEXT NOT NULL
+);

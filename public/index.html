@@ -1,3 +1,10 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TIFTON Go-Live Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   #tifton-tracker {
     --ink: #1b2027;
@@ -18,6 +25,10 @@
     --slate-bg: #eceae2;
     --teal: #1f7a72;
     --teal-bg: #daf0ee;
+    --plum: #6b4fa0;
+    --plum-bg: #f2ecfb;
+    --forest: #2f6b3a;
+    --forest-bg: #e2f0e4;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     color: var(--ink);
     background: linear-gradient(180deg, #9AC6E2 0%, #263138 100%);
@@ -80,9 +91,22 @@
   #tifton-tracker .stat.open .n { color: var(--rust); }
   #tifton-tracker .stat.inprogress .n { color: var(--amber); }
   #tifton-tracker .stat.testing .n { color: var(--steel); }
-  #tifton-tracker .stat.readyinstall .n { color: var(--slate); }
   #tifton-tracker .stat.readycustomer .n { color: var(--moss); }
-  #tifton-tracker .stat.completed .n { color: var(--teal); }
+  #tifton-tracker .stat.readyinstall .n { color: var(--slate); }
+  #tifton-tracker .stat.monitoring .n { color: var(--plum); }
+  #tifton-tracker .stat.onhold .n { color: var(--forest); }
+  #tifton-tracker .stat.closed .n { color: var(--teal); }
+  #tifton-tracker .stat.late-stat {
+    cursor: pointer;
+    background: var(--amber-bg);
+    border-left: 2px solid var(--amber);
+  }
+  #tifton-tracker .stat.late-stat .n { color: var(--amber); }
+  #tifton-tracker .stat.late-stat .l { color: var(--amber); font-weight: 600; }
+  #tifton-tracker .stat.late-stat:hover { background: #f6ddb8; }
+  #tifton-tracker .stat.late-stat.active { background: var(--amber); }
+  #tifton-tracker .stat.late-stat.active .n,
+  #tifton-tracker .stat.late-stat.active .l { color: white; }
   #tifton-tracker .stat.blocker-stat {
     cursor: pointer;
     background: var(--rust-bg);
@@ -148,18 +172,6 @@
   }
   #tifton-tracker .view-toggle button:last-child { border-right: none; }
   #tifton-tracker .view-toggle button.active { background: var(--ink); color: var(--paper); border-right-color: var(--ink); }
-  #tifton-tracker .btn-add {
-    font-family: inherit;
-    font-size: 13px;
-    font-weight: 600;
-    padding: 8px 14px;
-    border: none;
-    border-radius: 6px;
-    background: var(--steel);
-    color: white;
-    cursor: pointer;
-  }
-  #tifton-tracker .btn-add:hover { background: var(--steel-dark); }
   #tifton-tracker .btn-copy {
     font-family: inherit;
     font-size: 13px;
@@ -255,6 +267,10 @@
     padding: 16px;
   }
   #tifton-tracker .diagram-caption { font-size: 13px; color: #fff; line-height: 1.5; margin-top: 12px; }
+  #tifton-tracker .diagram-security { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+  #tifton-tracker .diagram-security-title { font-size: 14px; font-weight: 700; color: var(--ink); margin: 0 0 8px; font-family: 'Oswald', sans-serif; }
+  #tifton-tracker .diagram-security-text { font-size: 13px; color: var(--ink-soft); line-height: 1.6; margin: 0 0 8px; }
+  #tifton-tracker .diagram-security-text:last-child { margin-bottom: 0; }
   #tifton-tracker .visually-hidden-input {
     position: absolute;
     width: 1px;
@@ -270,6 +286,26 @@
   #tifton-tracker .body { padding: 18px 24px 26px; }
 
   /* Board view */
+  #tifton-tracker .as-of-banner {
+    font-family: 'Oswald', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: var(--ink);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--steel);
+    border-radius: 6px;
+    padding: 10px 16px;
+    margin-bottom: 14px;
+  }
+  #tifton-tracker .as-of-banner-empty {
+    color: var(--ink-soft);
+    font-weight: 600;
+    border-left-color: var(--slate);
+    text-transform: none;
+    letter-spacing: normal;
+  }
   #tifton-tracker .board {
     display: flex;
     gap: 14px;
@@ -323,9 +359,11 @@
   #tifton-tracker .card.open { border-left-color: var(--rust); }
   #tifton-tracker .card.inprogress { border-left-color: var(--amber); }
   #tifton-tracker .card.testing { border-left-color: var(--steel); }
-  #tifton-tracker .card.readyinstall { border-left-color: var(--slate); }
   #tifton-tracker .card.readycustomer { border-left-color: var(--moss); }
-  #tifton-tracker .card.completed { border-left-color: var(--teal); }
+  #tifton-tracker .card.readyinstall { border-left-color: var(--slate); }
+  #tifton-tracker .card.monitoring { border-left-color: var(--plum); }
+  #tifton-tracker .card.onhold { border-left-color: var(--forest); }
+  #tifton-tracker .card.closed { border-left-color: var(--teal); }
   #tifton-tracker .card-top { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
   #tifton-tracker .tag {
     font-size: 10.5px;
@@ -368,6 +406,8 @@
     font-weight: 600;
     border-radius: 4px;
     padding: 1px 7px;
+    background: var(--steel-bg);
+    color: var(--steel);
   }
   #tifton-tracker .priority-tag.high { background: var(--rust-bg); color: var(--rust); }
   #tifton-tracker .priority-tag.medium { background: var(--amber-bg); color: var(--amber); }
@@ -427,9 +467,11 @@
   #tifton-tracker .status-pill.open { background: var(--rust-bg); color: var(--rust); }
   #tifton-tracker .status-pill.inprogress { background: var(--amber-bg); color: var(--amber); }
   #tifton-tracker .status-pill.testing { background: var(--steel-bg); color: var(--steel); }
-  #tifton-tracker .status-pill.readyinstall { background: var(--slate-bg); color: var(--slate); }
   #tifton-tracker .status-pill.readycustomer { background: var(--moss-bg); color: var(--moss); }
-  #tifton-tracker .status-pill.completed { background: var(--teal-bg); color: var(--teal); }
+  #tifton-tracker .status-pill.readyinstall { background: var(--slate-bg); color: var(--slate); }
+  #tifton-tracker .status-pill.monitoring { background: var(--plum-bg); color: var(--plum); }
+  #tifton-tracker .status-pill.onhold { background: var(--forest-bg); color: var(--forest); }
+  #tifton-tracker .status-pill.closed { background: var(--teal-bg); color: var(--teal); }
 
   #tifton-tracker .empty { text-align: center; padding: 40px 20px; color: rgba(243,241,234,0.75); font-size: 13px; }
 
@@ -533,13 +575,13 @@
   #tifton-tracker .cal-detail-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
 
   /* Completed view */
-  #tifton-tracker .completed-wrap {
+  #tifton-tracker .closed-wrap {
     background: var(--panel);
     border: 1px solid var(--line);
     border-radius: 8px;
     padding: 16px;
   }
-  #tifton-tracker .completed-header {
+  #tifton-tracker .closed-header {
     font-family: 'Oswald', sans-serif;
     font-size: 17px;
     font-weight: 600;
@@ -548,8 +590,64 @@
     padding-bottom: 8px;
     margin-bottom: 14px;
   }
-  #tifton-tracker .completed-header .count { font-weight: 400; color: rgba(243,241,234,0.75); }
-  #tifton-tracker .completed-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+  #tifton-tracker .closed-header .count { font-weight: 400; color: rgba(243,241,234,0.75); }
+
+
+  /* History view */
+  #tifton-tracker .history-wrap {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  #tifton-tracker .history-header {
+    font-family: 'Oswald', sans-serif;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--ink);
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 8px;
+    margin-bottom: 14px;
+  }
+  #tifton-tracker .history-header .count { font-weight: 400; color: var(--ink-soft); }
+  #tifton-tracker .history-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  #tifton-tracker .history-table thead th {
+    text-align: left;
+    font-family: 'Oswald', sans-serif;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ink-soft);
+    padding: 6px 10px;
+    border-bottom: 2px solid var(--line);
+  }
+  #tifton-tracker .history-table tbody td { padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  #tifton-tracker .history-delete-btn {
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: transparent;
+    color: var(--ink-soft);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 15px;
+    line-height: 1;
+  }
+  #tifton-tracker .history-delete-btn:hover { background: var(--rust-bg); color: var(--rust); }
+  #tifton-tracker .history-diff-section {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 16px;
+  }
+  #tifton-tracker .history-diff-title { font-family: 'Oswald', sans-serif; font-size: 13.5px; font-weight: 600; color: var(--ink); margin-bottom: 4px; }
+  #tifton-tracker .history-diff-summary { font-size: 12.5px; color: var(--ink-soft); margin-bottom: 10px; }
+  #tifton-tracker .history-diff-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+  #tifton-tracker .history-diff-list:last-child { margin-bottom: 0; }
+  #tifton-tracker .history-diff-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; flex-wrap: wrap; }
+  #tifton-tracker .history-diff-arrow { color: var(--ink-soft); }
+  #tifton-tracker .history-diff-item-title { color: var(--ink); }
 
   /* Modal */
   #tifton-tracker .modal-backdrop {
@@ -590,6 +688,8 @@
     #tifton-tracker .head { flex-direction: column; align-items: flex-start; }
   }
 </style>
+</head>
+<body>
 
 <div id="tifton-tracker">
   <div class="head">
@@ -603,7 +703,6 @@
 
   <div class="toolbar">
     <div class="toolbar-filters">
-      <select id="filter-area"><option value="">All areas</option></select>
       <select id="filter-status">
         <option value="">All statuses</option>
       </select>
@@ -618,7 +717,6 @@
         <option value="target">Missing Due Date</option>
         <option value="either">Missing DevOps # or Due Date</option>
       </select>
-      <button class="btn-add" id="btn-add">+ Add issue</button>
       <button class="btn-copy" id="btn-copy-view">Copy view</button>
     </div>
     <div class="toolbar-search">
@@ -627,7 +725,8 @@
         <button data-view="board" class="active">Board</button>
         <button data-view="table">Table</button>
         <button data-view="calendar">Calendar</button>
-        <button data-view="completed">Completed</button>
+        <button data-view="closed">Closed</button>
+        <button data-view="history">History</button>
       </div>
     </div>
   </div>
@@ -638,6 +737,7 @@
   </div>
   <div class="save-note" id="save-note">Loading&hellip;</div>
   <div class="data-io">
+    <button class="btn-io" id="btn-upload-raid">Upload RAID Log</button>
     <button class="btn-io" id="btn-export">Export JSON</button>
     <button class="btn-io" id="btn-import">Import JSON</button>
   </div>
@@ -648,78 +748,22 @@
 <script>
 (function() {
   const ROOT = document.getElementById('tifton-tracker');
-  const CURRENT_DATA_VERSION = 7; // bump this whenever the seed data below should replace what's saved
+  const CURRENT_DATA_VERSION = 8; // bump this whenever the seed data below should replace what's saved
 
-  const SEED_ISSUES = [
-    {id:"raid-0", area:"Exotec", title:"Turn light blue when final pick is cut, and order is in complete status.", detail:"Turn light blue when final pick is cut, and order is in complete status.", status:"inprogress", owner:"James Adams", devops:"19923", priority:"High", blocker:"Y", targetDate:"2026-09-11", notes:"", reportedDate:""},
-    {id:"raid-1", area:"Inventory", title:"Confirm Bin Qty at Decant (FDD17676)", detail:"Confirm Bin Qty at Decant (FDD17676)", status:"inprogress", owner:"Hy-Tek", devops:"17676", priority:"Medium", blocker:"N", targetDate:"2026-10-09", notes:"", reportedDate:""},
-    {id:"raid-2", area:"Labeling", title:"Goods out of Pallet Label (FDD 17681)", detail:"Goods out of Pallet Label (FDD 17681)", status:"inprogress", owner:"Hy-Tek", devops:"17681", priority:"Medium", blocker:"N", targetDate:"2026-08-14", notes:"", reportedDate:""},
-    {id:"raid-3", area:"Packing", title:"Pack Station Box Recommendation (FDD18099)", detail:"Pack Station Box Recommendation (FDD18099)", status:"inprogress", owner:"Hy-Tek", devops:"18099", priority:"High", blocker:"N", targetDate:"2026-10-16", notes:"", reportedDate:""},
-    {id:"raid-4", area:"Exotec", title:"Remove chute-order relationship when picks are cancelled/cut", detail:"Ensure order relationship with chute is removed when all picks are concelled or cut from an orders", status:"inprogress", owner:"Mike Loop", devops:"22994", priority:"High", blocker:"Y/N", targetDate:"2026-09-11", notes:"", reportedDate:""},
-    {id:"raid-5", area:"Packing", title:"Packstation -Transient Data is getting stuck when user gets an error", detail:"Packstation -Transient Data is getting stuck when user gets an error", status:"inprogress", owner:"Roxie", devops:"24446", priority:"High", blocker:"Y", targetDate:"2026-09-11", notes:"", reportedDate:""},
-    {id:"raid-6", area:"RF / Devices", title:"Webtool release-user should also release the associated pick", detail:"Webtool to release user like kicking RF user but also releases the pick associated with user.", status:"inprogress", owner:"Michael Adamski", devops:"24546", priority:"High", blocker:"Y", targetDate:"2026-09-14", notes:"", reportedDate:""},
-    {id:"raid-7", area:"Inventory", title:"Validation/error-handling enhancements for SKU setup & wave release checks", detail:"Proposed validation/error handling enhancements around SKU setup and wave release checks.", status:"inprogress", owner:"Mike Loop", devops:"24713", priority:"High", blocker:"Y", targetDate:"2026-09-18", notes:"", reportedDate:""},
-    {id:"raid-8", area:"Shipping", title:"LTL MUs that are flipping to shipped", detail:"LTL MUs that are flipping to shipped", status:"inprogress", owner:"", devops:"25126", priority:"High", blocker:"Y", targetDate:"", notes:"Just came in", reportedDate:""},
-    {id:"raid-9", area:"Inventory", title:"DG - S-LAN locations have Loc_Allocation records", detail:"DG - S-LAN locations have Loc_Allocation records", status:"inprogress", owner:"Michael Adamski", devops:"25087", priority:"High", blocker:"Y", targetDate:"2026-09-18", notes:"", reportedDate:""},
-    {id:"raid-10", area:"Exotec", title:"JC Penny and KOHL's solution for divided orders - infinity chute", detail:"JC Penny and KOHL's solution for divided orders - infinity chute", status:"open", owner:"", devops:"", priority:"High", blocker:"N", targetDate:"", notes:"FDD to be created", reportedDate:""},
-    {id:"raid-11", area:"Equipment", title:"Lights for Tompkins for the bins (3 lights versus 2)", detail:"Lights for Tompkins for the bins (3 lights versus 2)", status:"open", owner:"", devops:"24368", priority:"High", blocker:"N", targetDate:"2026-08-28", notes:"", reportedDate:""},
-    {id:"raid-12", area:"Inventory", title:"Inventory Discrepancies", detail:"Inventory Discrepancies", status:"open", owner:"", devops:"", priority:"High", blocker:"N", targetDate:"", notes:"", reportedDate:""},
-    {id:"raid-13", area:"Inventory", title:"location ID pre-populates after dropping to CASI000001 the first time. (FDD)", detail:"location ID pre-populates after dropping to CASI000001 the first time. (FDD)", status:"open", owner:"Hy-Tek", devops:"14197", priority:"Low", blocker:"N", targetDate:"", notes:"FDD to be created", reportedDate:""},
-    {id:"raid-14", area:"Exotec", title:"Pick larger items before smaller (Exotec/Tompkins)", detail:"Pick larger items before smaller from Exotec and Tompkins. #4 Medium. (FDD)", status:"open", owner:"Hy-Tek", devops:"17684", priority:"Low", blocker:"N", targetDate:"", notes:"FDD to be created", reportedDate:""},
-    {id:"raid-15", area:"Inventory", title:"Bin Divisions (FDD)", detail:"Bin Divisions (FDD)", status:"open", owner:"Hy-Tek", devops:"17683", priority:"Low", blocker:"N", targetDate:"", notes:"FDD to be created", reportedDate:""},
-    {id:"raid-16", area:"Inbound", title:"Inbound Hospital Pallets", detail:"Inbound Hospital Pallets", status:"open", owner:"Delta Galil Ops, Hy-Tek", devops:"13997", priority:"Low", blocker:"N", targetDate:"", notes:"FDD to be revised", reportedDate:""},
-    {id:"raid-17", area:"Exotec", title:"Lowercase SKUs failing to decant to Exotec", detail:"Decanting in lowercase SKUs to Exotec. Part of UPC build, failed during testing.", status:"open", owner:"Hy-Tek", devops:"23126", priority:"Low", blocker:"N", targetDate:"2026-08-04", notes:"", reportedDate:""},
-    {id:"raid-18", area:"Consolidation", title:"Direct consolidated pallets to specific shipping lane", detail:"Direct users with consolidated pallets to specific shipping lane(FDD17678)", status:"open", owner:"Hy-Tek", devops:"17678", priority:"Low", blocker:"N", targetDate:"", notes:"ON HOLD - DEV", reportedDate:""},
-    {id:"raid-19", area:"Shipping", title:"Outbound QC percentage Codes entries (FDD 18277)", detail:"Outbound QC percentage Codes entries (FDD 18277)", status:"open", owner:"Hy-Tek", devops:"18277", priority:"Low", blocker:"N", targetDate:"2026-08-14", notes:"", reportedDate:""},
-    {id:"raid-20", area:"RF / Devices", title:"Logout should clear user from Session table", detail:"Webtools/UI Logging off needs to remove from Session table. (FDD)", status:"open", owner:"Hy-Tek", devops:"20958", priority:"Medium", blocker:"N", targetDate:"", notes:"FDD to be created", reportedDate:""},
-    {id:"raid-21", area:"Exotec", title:"DG -Oversized bin at Exotec creating 008 error message", detail:"DG -Oversized bin at Exotec creating 008 error message", status:"open", owner:"", devops:"24284", priority:"Medium", blocker:"N", targetDate:"", notes:"", reportedDate:""},
-    {id:"raid-22", area:"Consolidation", title:"RF Consolidation Flow (FDD)", detail:"RF Consolidation Flow (FDD)", status:"open", owner:"", devops:"24187", priority:"", blocker:"N", targetDate:"", notes:"FDD to be created", reportedDate:""},
-    {id:"raid-23", area:"Shipping", title:"Outbound Sorter Destination (FDD)", detail:"Outbound Sorter Destination (FDD)", status:"open", owner:"", devops:"24186", priority:"", blocker:"N", targetDate:"", notes:"FDD to be created", reportedDate:""},
-    {id:"raid-24", area:"RF / Devices", title:"Speed of scanning case packs on the floor locations.", detail:"Speed of scanning case packs on the floor locations.", status:"open", owner:"", devops:"24398", priority:"Medium", blocker:"N", targetDate:"", notes:"", reportedDate:""},
-    {id:"raid-25", area:"Exotec", title:"Mission sent to a bot on the bottom to go to a chute on the top level", detail:"Mission sent to a bot on the bottom to go to a chute on the top level", status:"open", owner:"", devops:"24436", priority:"Low", blocker:"", targetDate:"", notes:"", reportedDate:""},
-    {id:"raid-26", area:"Reporting", title:"Wave containerization report should include ship-to customer ID & carrier code", detail:"DG -Update the wave containerization report to look at ship_to_customer_ID and also carrier code", status:"open", owner:"", devops:"24694", priority:"Medium", blocker:"N", targetDate:"", notes:"", reportedDate:""},
-    {id:"raid-27", area:"Inventory", title:"Loc to loc move to give a clearer error message", detail:"Loc to loc move to give a clearer error message", status:"open", owner:"", devops:"24717", priority:"", blocker:"N", targetDate:"", notes:"", reportedDate:""},
-    {id:"raid-28", area:"Reporting", title:"Archiving BULK pick_queue records.", detail:"Archiving BULK pick_queue records.", status:"open", owner:"", devops:"24735", priority:"", blocker:"N", targetDate:"", notes:"", reportedDate:""},
-    {id:"raid-29", area:"Shipping", title:"Create a 0120 with mu_id", detail:"Create a 0120 with mu_id", status:"open", owner:"Steve", devops:"24820", priority:"", blocker:"N", targetDate:"", notes:"", reportedDate:""},
-    {id:"raid-30", area:"Exotec", title:"Order incorrectly assigned ORDR_SHIP_PGSN instead of routing through Exotec", detail:"Assigned a ORDR_SHIP_PGSN, when it should have just gone through Exotec.", status:"open", owner:"Alex", devops:"24957", priority:"High", blocker:"Y", targetDate:"", notes:"New just came in", reportedDate:""},
-    {id:"raid-31", area:"Exotec", title:"Show bag image indicator on Decant/Exotec/T-Sort screens", detail:"Decant/Exotec/TSORT - They want to display an image signifying the bag on these screens", status:"open", owner:"Jim", devops:"25048", priority:"", blocker:"", targetDate:"", notes:"New just came in", reportedDate:""},
-    {id:"raid-32", area:"Packing", title:"Pack station SKU summary gets cluttered with a new line per QTY scanned", detail:"Pack Station - The process of scanning UPCs and entering QTYs in pack station gets cumbersome to verify on screen because each QTY added to the pack LPN gets a new line in the SKU summary section.", status:"open", owner:"Jim", devops:"25049", priority:"", blocker:"", targetDate:"", notes:"FDD to be created", reportedDate:""},
-    {id:"raid-33", area:"Deployment", title:"Decant/split bin UOM", detail:"Decant/split bin UOM", status:"open", owner:"Beth", devops:"25090", priority:"High", blocker:"Y", targetDate:"2026-09-11", notes:"", reportedDate:""},
-    {id:"raid-34", area:"Packing", title:"Hospital screen-Pack-Out Workflow Cannot Reach Dock Status", detail:"Hospital screen-Pack-Out Workflow Cannot Reach Dock Status", status:"open", owner:"Hoang", devops:"25139", priority:"High", blocker:"Y", targetDate:"", notes:"", reportedDate:""},
-    {id:"raid-35", area:"RF / Devices", title:"DG- RF Drop LPN delays", detail:"DG- RF Drop LPN delays", status:"open", owner:"Hoang", devops:"25136", priority:"Medium", blocker:"Y", targetDate:"", notes:"", reportedDate:""},
-    {id:"raid-36", area:"Consolidation", title:"DG- RF Outbound Consolidator delays", detail:"DG- RF Outbound Consolidator delays", status:"open", owner:"Hoang", devops:"25137", priority:"Medium", blocker:"Y", targetDate:"", notes:"", reportedDate:""},
-    {id:"raid-37", area:"Reporting", title:"Wave Containerization Report Mismatch", detail:"Wave Containerization Report Mismatch", status:"open", owner:"Jake", devops:"25201", priority:"Medium", blocker:"", targetDate:"", notes:"Just came in", reportedDate:""},
-    {id:"raid-38", area:"Deployment", title:"DG UOM - GTP wrong quantities sending to Exotec", detail:"DG UOM - GTP wrong quantities sending to Exotec", status:"open", owner:"Antoine", devops:"25191", priority:"High", blocker:"Y", targetDate:"", notes:"Part of Bag UOM", reportedDate:""},
-    {id:"raid-39", area:"Inventory", title:"Not all allocated qty is being removed from CASI", detail:"Not all allocated qty is being removed from CASI", status:"testing", owner:"James Haumann", devops:"20921", priority:"High", blocker:"Y/N", targetDate:"2026-08-14", notes:"", reportedDate:""},
-    {id:"raid-40", area:"T-Sort", title:"DG - Print_Data records changing during picking process", detail:"DG - Print_Data records changing during picking process", status:"testing", owner:"Hoang", devops:"24214", priority:"High", blocker:"Y", targetDate:"2026-09-11", notes:"", reportedDate:""},
-    {id:"raid-41", area:"Shipping", title:"WALCP0813 released with incorrect ship_day/WXSOrderType values", detail:"DG released WALCP0813. ship_day was MA and WXSOrderType in print_data was MANUAL", status:"testing", owner:"Michael Adamski", devops:"24460", priority:"High", blocker:"Y", targetDate:"2026-09-07", notes:"", reportedDate:""},
-    {id:"raid-42", area:"Shipping", title:"Ship parent MU when all child MU's are shipped", detail:"Ship parent MU when all child MU's are shipped", status:"testing", owner:"", devops:"24116", priority:"High", blocker:"N", targetDate:"2026-08-12", notes:"", reportedDate:""},
-    {id:"raid-43", area:"Inbound", title:"Inbound pallet assignment should consider all ASNs assigned to a door", detail:"Inbound Pallet Assignments to need look at all assigned ASNs to Door for creating pallet assignments (FDD)", status:"testing", owner:"Delta Galil Ops", devops:"19968", priority:"Medium", blocker:"N", targetDate:"2026-08-07", notes:"", reportedDate:""},
-    {id:"raid-44", area:"Shipping", title:"EDI Routing Process (FDD 10521 /13999/18395)", detail:"EDI Routing Process (FDD 10521 /13999/18395)", status:"testing", owner:"Hoang", devops:"10521 /13999/18395", priority:"High", blocker:"Y", targetDate:"2026-08-11", notes:"", reportedDate:""},
-    {id:"raid-45", area:"Inbound", title:"Inbound receipts", detail:"Inbound receipts", status:"testing", owner:"Hy-Tek", devops:"20918", priority:"High", blocker:"N", targetDate:"2026-08-14", notes:"", reportedDate:""},
-    {id:"raid-46", area:"Packing", title:"Pack station Complete button turns green without an actual scan", detail:"Packstation complete button turning green when user scans even when they dont scan anything", status:"testing", owner:"Roxie", devops:"24338", priority:"High", blocker:"Y", targetDate:"2026-09-11", notes:"", reportedDate:""},
-    {id:"raid-47", area:"Shipping", title:"DG- Missing VLOX record for an OB sorter destination", detail:"DG- Missing VLOX record for an OB sorter destination", status:"testing", owner:"Hoang", devops:"24545", priority:"High", blocker:"Y", targetDate:"", notes:"Working to get an example and correct. 9/11/26", reportedDate:""},
-    {id:"raid-48", area:"Shipping", title:"MUs not flipping to shipped status", detail:"MUs Not flipping - JIm found an issue 8/14/26", status:"testing", owner:"Corbin Carter", devops:"24548", priority:"High", blocker:"Y", targetDate:"2026-09-11", notes:"", reportedDate:""},
-    {id:"raid-49", area:"Exotec", title:"CasePick allowed picks with no allocated qty in CASI (260 incomplete picks)", detail:"CasePick validation issue where users were able to pick SKUs onto robots with no allocated quantity in CASI, resulting in 260 incomplete picks on wave WAL081802.", status:"testing", owner:"James Haumann", devops:"24712", priority:"High", blocker:"Y", targetDate:"", notes:"Waiting for Bag uom", reportedDate:""},
-    {id:"raid-50", area:"Shipping", title:"Shipment overshipped item", detail:"Shipment overshipped item", status:"testing", owner:"James Haumann", devops:"24714", priority:"High", blocker:"Y", targetDate:"2026-09-04", notes:"", reportedDate:""},
-    {id:"raid-51", area:"T-Sort", title:"Wave pick casecut incorrectly updating loc_allocation during picking", detail:"Issue with the way wave pick casecut is updating loc_allocation during the pricking process.", status:"testing", owner:"James", devops:"24922", priority:"High", blocker:"Y", targetDate:"2026-09-11", notes:"9/4 - Short term fix - 9/11/2026 - long term", reportedDate:""},
-    {id:"raid-52", area:"Inventory", title:"WALCP wave created picks/replens with no inventory in the building", detail:"DG- WALCP. This is a wave of Walmart casepacks created pick and Replens. However, no inventory in the building", status:"testing", owner:"Hoang", devops:"24943", priority:"High", blocker:"Y", targetDate:"", notes:"New just came in", reportedDate:""},
-    {id:"raid-53", area:"Deployment", title:"Deliver Bag UoM change (FDD 14185)", detail:"Deliver Bag UoM change (FDD 14185)", status:"readycustomer", owner:"Steve", devops:"Parent 14185, 24242", priority:"High", blocker:"Y", targetDate:"2026-08-18", notes:"", reportedDate:""},
-    {id:"raid-54", area:"T-Sort", title:"Case quantities must be divisible by T-Sort values (T-Sort Max limitation)", detail:"System limitation requiring case quantities to be divisible by T-sort values; the team aligned on the need to support flexible quantities based on bot capacity rather than SKU divisibility. Tsort max issue.", status:"readyinstall", owner:"Jim Harjo", devops:"24017", priority:"High", blocker:"Y", targetDate:"2026-08-28", notes:"", reportedDate:""},
-    {id:"raid-55", area:"Exotec", title:"Robot max for Exotec - system only allows Exotec to pick 1", detail:"Robot max for Exotec - system only allows Exotec to pick 1", status:"readycustomer", owner:"DG", devops:"24117", priority:"High", blocker:"Y", targetDate:"2026-08-04", notes:"", reportedDate:""},
-    {id:"raid-56", area:"Inbound", title:"Inbound Dashboard", detail:"Inbound Dashboard", status:"readycustomer", owner:"Hy-Tek", devops:"20919", priority:"Medium", blocker:"N", targetDate:"2026-07-31", notes:"", reportedDate:""},
-    {id:"raid-57", area:"Exotec", title:"user_ID should update to GTP_INVNT when a pick routes to Exotec", detail:"When a pick gets sent to Exotec, user_ID needs to update to GTP_INVNT to show no inventory for SKU in system.", status:"readycustomer", owner:"Hy-Tek", devops:"19948", priority:"High", blocker:"Y", targetDate:"2026-08-04", notes:"", reportedDate:""},
-    {id:"raid-58", area:"Inventory", title:"Overriding bins when the qty is zero", detail:"Overriding bins when the qty is zero", status:"readyinstall", owner:"Hy-Tek", devops:"19942", priority:"Medium", blocker:"N", targetDate:"2026-06-12", notes:"", reportedDate:""},
-    {id:"raid-59", area:"Exotec", title:"No divert lane assignment received error on CasePick screen from Tompkins", detail:"No divert lane assignment received error on CasePick screen from Tompkins", status:"readyinstall", owner:"Hy-Tek", devops:"20962", priority:"Medium", blocker:"N", targetDate:"2026-08-14", notes:"", reportedDate:""},
-    {id:"raid-60", area:"Shipping", title:"Outbound Sortation Configuration Dashboard (route customers to lanes)", detail:"Outbound Sortation Configuration Dashboard. - Tool for DG to route customers to specific lanes.", status:"readyinstall", owner:"Hy-Tek", devops:"20922", priority:"Medium", blocker:"N", targetDate:"2026-07-10", notes:"", reportedDate:""},
-    {id:"raid-61", area:"Exotec", title:"Exotec SKU description / SKU property mismatch", detail:"Exotec SKU Description - SKU Property (FDD 18278) - 7/30 Test on 58 (send in a pick, look at it on the pick).", status:"readyinstall", owner:"Hy-Tek", devops:"18278", priority:"High", blocker:"N", targetDate:"2026-08-11", notes:"", reportedDate:""},
-    {id:"raid-62", area:"Exotec", title:"Pick Queue is not updating user id when an Exotec Pick is completed", detail:"Pick Queue is not updating user id when an Exotec Pick is completed", status:"readyinstall", owner:"Hy-Tek", devops:"19357", priority:"High", blocker:"N", targetDate:"2026-08-11", notes:"", reportedDate:""},
-  ];
+  const SEED_ISSUES = [];
 
-  const STATUS_LABELS = { open: 'Open', inprogress: 'In Progress (DEV)', testing: 'Testing (PSO)', readyinstall: 'Ready for Install', readycustomer: 'Ready for Customer', completed: 'Completed' };
-  const STATUS_ORDER = ['open', 'inprogress', 'testing', 'readyinstall', 'readycustomer', 'completed'];
+  const STATUS_LABELS = { open: 'Open', inprogress: 'In Progress (Dev)', testing: 'Testing', readycustomer: 'Ready for Customer', readyinstall: 'Ready for Install', monitoring: 'Monitoring', onhold: 'On Hold', closed: 'Closed' };
+  // Full canonical list of every status the tool understands — used by
+  // filters, the Table view, and the edit modal's status dropdown.
+  const STATUS_ORDER = ['open', 'inprogress', 'testing', 'readycustomer', 'readyinstall', 'monitoring', 'onhold', 'closed'];
+  // The Board view intentionally shows only these five, in this exact
+  // order — Monitoring/On Hold/Closed items still exist and are fully
+  // trackable elsewhere (Table view, Closed tab, filters), they're just
+  // not given their own Board column.
+  const BOARD_STATUS_ORDER = ['open', 'inprogress', 'testing', 'readycustomer', 'readyinstall'];
 
   let issues = [];
+  let currentAsOfDate = null;
   let currentView = 'board';
   let calendarMonth = (() => {
     const d = new Date();
@@ -735,6 +779,7 @@
       if (!res.ok) throw new Error('Failed to load issues: ' + res.status);
       const payload = await res.json();
       const storedVersion = payload.dataVersion || 0;
+      currentAsOfDate = payload.asOfDate || null;
 
       if (storedVersion < CURRENT_DATA_VERSION) {
         // Fresh dataset supersedes whatever was previously saved.
@@ -766,15 +811,22 @@
     if (changed) saveIssues();
   }
 
-  async function saveIssues() {
+  // asOfDate is only passed when this save represents a live RAID Log
+  // upload (see openUploadRaidModal) — omitting it on manual single-issue
+  // edits means the "RAID LOG AS OF" date on the Board only moves when you
+  // actually re-upload the source spreadsheet, not on every small tweak.
+  async function saveIssues(asOfDate) {
     const noteEl = document.getElementById('save-note');
     try {
+      const body = { issues, dataVersion: CURRENT_DATA_VERSION };
+      if (asOfDate) body.asOfDate = asOfDate;
       const res = await fetch('/api/issues', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ issues, dataVersion: CURRENT_DATA_VERSION }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error('Save failed: ' + res.status);
+      if (asOfDate) currentAsOfDate = asOfDate;
       if (noteEl) { noteEl.textContent = 'Saved · shared with everyone using this tracker'; }
     } catch (e) {
       if (noteEl) { noteEl.textContent = 'Could not save — changes may not persist'; }
@@ -782,40 +834,43 @@
     }
   }
 
-  function uniqueAreas() {
-    return [...new Set(issues.map(i => i.area))].sort();
-  }
-
   function populateFilters() {
-    const areaSel = document.getElementById('filter-area');
-    const curArea = areaSel.value;
-    areaSel.innerHTML = '<option value="">All areas</option>' + uniqueAreas().map(a => `<option value="${a}">${a}</option>`).join('');
-    areaSel.value = curArea;
-
     const statusSel = document.getElementById('filter-status');
     const curStatus = statusSel.value;
     statusSel.innerHTML = '<option value="">All statuses</option>' + STATUS_ORDER.map(s => `<option value="${s}">${STATUS_LABELS[s]}</option>`).join('');
     statusSel.value = curStatus;
   }
 
+  // A target date that's a real ISO date (not text like "TBD" or "On Hold"),
+  // in the past, and not yet closed — closed items don't count as "late"
+  // even if their target date has passed, since the work is done.
+  function isLate(issue) {
+    if (!issue.targetDate || !/^\d{4}-\d{2}-\d{2}$/.test(issue.targetDate)) return false;
+    if (issue.status === 'closed') return false;
+    return issue.targetDate < todayISO();
+  }
+
+  let lateFilterActive = false;
+
   function getFiltered() {
-    const area = document.getElementById('filter-area').value;
     const status = document.getElementById('filter-status').value;
     const blockerFilter = document.getElementById('filter-blocker').value;
     const missingFilter = document.getElementById('filter-missing').value;
     const q = document.getElementById('search').value.trim().toLowerCase();
     return issues.filter(i => {
-      if (area && i.area !== area) return false;
       if (status && i.status !== status) return false;
       if (blockerFilter === 'Y' && !isBlocker(i.blocker)) return false;
       if (blockerFilter === 'N' && isBlocker(i.blocker)) return false;
       const missingDevops = !i.devops;
-      const missingTarget = !i.targetDate;
+      // "Missing" a due date means blank OR a non-date placeholder like
+      // "TBD"/"On Hold"/"N/A" — anything that isn't a real, usable date.
+      const missingTarget = !i.targetDate || !/^\d{4}-\d{2}-\d{2}$/.test(i.targetDate);
       if (missingFilter === 'devops' && !missingDevops) return false;
       if (missingFilter === 'target' && !missingTarget) return false;
       if (missingFilter === 'either' && !(missingDevops || missingTarget)) return false;
+      if (lateFilterActive && !isLate(i)) return false;
       if (q) {
-        const hay = (i.title + ' ' + i.detail + ' ' + i.area + ' ' + (i.owner||'') + ' ' + (i.devops||'') + ' ' + (i.notes||'')).toLowerCase();
+        const hay = (i.title + ' ' + i.detail + ' ' + (i.owner||'') + ' ' + (i.devops||'') + ' ' + (i.notes||'')).toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -828,10 +883,21 @@
     issues.forEach(i => { counts[i.status] = (counts[i.status]||0) + 1; });
     const blockerCount = issues.filter(i => isBlocker(i.blocker)).length;
     const blockerActive = document.getElementById('filter-blocker').value === 'Y';
+    const lateCount = issues.filter(isLate).length;
     const row = document.getElementById('stat-row');
-    row.innerHTML = STATUS_ORDER.map(s =>
+    // Mirrors the Board view's 5 columns for a clean, consistent header —
+    // Monitoring/On Hold/Closed items are still fully counted and
+    // visible elsewhere (Table view, Closed tab), just not given their
+    // own tile here.
+    row.innerHTML = BOARD_STATUS_ORDER.map(s =>
       `<div class="stat ${s}"><div class="n">${counts[s]}</div><div class="l">${STATUS_LABELS[s]}</div></div>`
-    ).join('') + `<div class="stat blocker-stat${blockerActive ? ' active' : ''}" id="blocker-stat" title="Click to show only Walmart blockers"><div class="n">${blockerCount}</div><div class="l">Walmart Blockers</div></div>`;
+    ).join('')
+      + `<div class="stat late-stat${lateFilterActive ? ' active' : ''}" id="late-stat" title="Click to show only late items (target date has passed)"><div class="n">${lateCount}</div><div class="l">Late</div></div>`
+      + `<div class="stat blocker-stat${blockerActive ? ' active' : ''}" id="blocker-stat" title="Click to show only Walmart blockers"><div class="n">${blockerCount}</div><div class="l">Walmart Blockers</div></div>`;
+    document.getElementById('late-stat').addEventListener('click', () => {
+      lateFilterActive = !lateFilterActive;
+      render();
+    });
     document.getElementById('blocker-stat').addEventListener('click', () => {
       const sel = document.getElementById('filter-blocker');
       sel.value = sel.value === 'Y' ? '' : 'Y';
@@ -847,8 +913,15 @@
 
   function formatDate(iso) {
     if (!iso) return '';
+    // Target dates pulled from the RAID log are sometimes text placeholders
+    // ("TBD", "On HOLD", "N/A", "FDD to be created") rather than real
+    // dates — only attempt to reformat things that actually look like an
+    // ISO date (YYYY-MM-DD); anything else is shown exactly as entered
+    // rather than becoming "Invalid Date".
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
     const [y, m, d] = iso.split('-').map(Number);
     const dt = new Date(y, m - 1, d);
+    if (isNaN(dt)) return iso;
     return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
@@ -857,16 +930,17 @@
   }
 
   function cardHtml(issue) {
-    const priorityClass = (issue.priority || '').toLowerCase();
+    const priorityClass = ['high','medium','low'].includes((issue.priority || '').toLowerCase()) ? issue.priority.toLowerCase() : '';
+    const priorityLabel = priorityClass ? `${issue.priority} priority` : `Priority: ${issue.priority}`;
     return `
       <div class="card ${issue.status}" data-id="${issue.id}">
         <div class="card-top">
-          <span class="tag">${issue.area}</span>
           ${isBlocker(issue.blocker) ? `<span class="blocker-tag">Walmart blocker${issue.blocker === 'Y/N' ? ' (Y/N)' : ''}</span>` : ''}
         </div>
         <div class="card-title">${issue.title}</div>
         <div class="meta-row">
-          ${issue.priority ? `<span class="priority-tag ${priorityClass}">${issue.priority} priority</span>` : ''}
+          ${issue.raidNumber ? `<span class="devops-tag">RAID #${issue.raidNumber}</span>` : ''}
+          ${issue.priority ? `<span class="priority-tag ${priorityClass}">${priorityLabel}</span>` : ''}
           ${issue.targetDate ? `<span class="target-tag">Target: ${formatDate(issue.targetDate)}</span>` : ''}
         </div>
         <div class="card-detail">${issue.detail}</div>
@@ -881,7 +955,10 @@
   }
 
   function renderBoard(list) {
-    const cols = STATUS_ORDER.map(st => {
+    const asOfHtml = currentAsOfDate
+      ? `<div class="as-of-banner">RAID LOG AS OF ${formatDate(currentAsOfDate).toUpperCase()}</div>`
+      : `<div class="as-of-banner as-of-banner-empty">No RAID log uploaded yet — use "Upload RAID Log" to get started</div>`;
+    const cols = BOARD_STATUS_ORDER.map(st => {
       const items = list.filter(i => i.status === st);
       return `
         <div class="board-col">
@@ -890,7 +967,7 @@
         </div>
       `;
     }).join('');
-    return `<div class="board">${cols}</div>`;
+    return `${asOfHtml}<div class="board">${cols}</div>`;
   }
 
   function renderTable(list) {
@@ -901,11 +978,10 @@
     if (!sorted.length) return '<div class="empty">No issues match these filters</div>';
     return `
       <table>
-        <thead><tr><th>Area</th><th>Issue</th><th>DevOps #</th><th>Priority</th><th>Walmart Blocker</th><th>Reported</th><th>Target</th><th>Owner</th><th>Status</th></tr></thead>
+        <thead><tr><th>Issue</th><th>DevOps #</th><th>Priority</th><th>Walmart Blocker</th><th>Reported</th><th>Target</th><th>Owner</th><th>Status</th></tr></thead>
         <tbody>
           ${sorted.map(i => `
             <tr data-id="${i.id}">
-              <td>${i.area}</td>
               <td>
                 <strong>${i.title}</strong><br><span style="color:var(--ink-soft);font-size:12px;">${i.detail}</span>
                 ${i.notes ? `<br><span style="color:var(--steel-dark);font-size:11.5px;font-style:italic;"><strong>Notes:</strong> ${i.notes}</span>` : ''}
@@ -991,15 +1067,184 @@
     `;
   }
 
-  function renderCompletedList(list) {
-    const completed = list.filter(i => i.status === 'completed').sort((a,b) => a.title.localeCompare(b.title));
-    if (!completed.length) return '<div class="empty">No completed issues match these filters.</div>';
+  function renderClosedList(list) {
+    const closed = list.filter(i => i.status === 'closed').sort((a,b) => a.title.localeCompare(b.title));
+    if (!closed.length) return '<div class="empty">No closed issues match these filters.</div>';
     return `
-      <div class="completed-wrap">
-        <div class="completed-header">Completed <span class="count">(${completed.length})</span></div>
-        <div class="completed-grid">${completed.map(cardHtml).join('')}</div>
+      <div class="closed-wrap">
+        <div class="closed-header">Closed <span class="count">(${closed.length})</span></div>
+        <table>
+          <thead><tr><th>Issue</th><th>DevOps #</th><th>Priority</th><th>Walmart Blocker</th><th>Reported</th><th>Target</th><th>Owner</th><th>Status</th></tr></thead>
+          <tbody>
+            ${closed.map(i => `
+              <tr data-id="${i.id}">
+                <td>
+                  <strong>${i.title}</strong><br><span style="color:var(--ink-soft);font-size:12px;">${i.detail}</span>
+                  ${i.notes ? `<br><span style="color:var(--steel-dark);font-size:11.5px;font-style:italic;"><strong>Notes:</strong> ${i.notes}</span>` : ''}
+                </td>
+                <td>${i.devops || '—'}</td>
+                <td>${i.priority || '—'}</td>
+                <td>${isBlocker(i.blocker) ? `<span class="blocker-tag">${i.blocker}</span>` : (i.blocker || '—')}</td>
+                <td>${i.reportedDate ? formatDate(i.reportedDate) : '—'}</td>
+                <td>${i.targetDate ? formatDate(i.targetDate) : '—'}</td>
+                <td>${i.owner || '—'}</td>
+                <td><span class="status-pill ${i.status}">${STATUS_LABELS[i.status]}</span></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
       </div>
     `;
+  }
+
+  // ---------- History (upload snapshots) ----------
+
+  function diffSnapshotItems(older, newer) {
+    const olderMap = new Map(older.map(i => [i.id, i]));
+    const newerMap = new Map(newer.map(i => [i.id, i]));
+    const added = [];
+    const removed = [];
+    const statusChanged = [];
+    newerMap.forEach((item, id) => {
+      if (!olderMap.has(id)) {
+        added.push(item);
+      } else if (olderMap.get(id).status !== item.status) {
+        statusChanged.push({ item, from: olderMap.get(id).status, to: item.status });
+      }
+    });
+    olderMap.forEach((item, id) => {
+      if (!newerMap.has(id)) removed.push(item);
+    });
+    return { added, removed, statusChanged };
+  }
+
+  async function loadAndRenderHistory() {
+    const body = document.getElementById('body');
+    let snapshots;
+    try {
+      const res = await fetch('/api/snapshots');
+      if (!res.ok) throw new Error('Failed to load history: ' + res.status);
+      const payload = await res.json();
+      snapshots = payload.snapshots || [];
+    } catch (e) {
+      if (currentView === 'history') {
+        body.innerHTML = '<div class="empty">Could not load upload history.</div>';
+      }
+      return;
+    }
+
+    if (currentView !== 'history') return; // view changed while loading
+
+    if (!snapshots.length) {
+      body.innerHTML = `
+        <div class="history-wrap">
+          <div class="history-header">Upload History</div>
+          <div class="empty">No RAID log uploads recorded yet. Use "Upload RAID Log" to start building history.</div>
+        </div>
+      `;
+      return;
+    }
+
+    const tableRows = snapshots.map(s => {
+      const c = s.statusCounts;
+      return `
+        <tr>
+          <td>${formatDateTime(s.uploadedAt)}</td>
+          <td>${s.itemCount}</td>
+          <td>${c.open || 0}</td>
+          <td>${c.testing || 0}</td>
+          <td>${c.monitoring || 0}</td>
+          <td>${c.onhold || 0}</td>
+          <td>${c.closed || 0}</td>
+          <td><button type="button" class="history-delete-btn" data-snapshot-id="${s.id}" title="Delete this upload record">&times;</button></td>
+        </tr>
+      `;
+    }).join('');
+
+    let diffHtml = '';
+    if (snapshots.length >= 2) {
+      diffHtml = '<div class="history-diff-section"><div class="history-diff-title">Comparing the two most recent uploads&hellip;</div></div>';
+    }
+
+    body.innerHTML = `
+      <div class="history-wrap">
+        <div class="history-header">Upload History <span class="count">(${snapshots.length} upload${snapshots.length === 1 ? '' : 's'})</span></div>
+        <div id="history-diff-slot">${diffHtml}</div>
+        <table class="history-table">
+          <thead><tr><th>Uploaded</th><th>Items</th><th>Open</th><th>Testing</th><th>Monitoring</th><th>On Hold</th><th>Closed</th><th></th></tr></thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </div>
+    `;
+
+    body.querySelectorAll('.history-delete-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-snapshot-id');
+        showConfirmModal(
+          'Delete this upload record from History? This only removes it from the History log — it does not change your current tracker data.',
+          async () => {
+            try {
+              await fetch('/api/snapshots/' + id, { method: 'DELETE' });
+            } catch (e) {
+              console.error('Delete snapshot failed', e);
+            }
+            if (currentView === 'history') loadAndRenderHistory();
+          },
+          'Delete'
+        );
+      });
+    });
+
+    if (snapshots.length >= 2) {
+      const [newest, previous] = snapshots; // already newest-first
+      try {
+        const [newestRes, previousRes] = await Promise.all([
+          fetch('/api/snapshots/' + newest.id),
+          fetch('/api/snapshots/' + previous.id),
+        ]);
+        const newestDetail = await newestRes.json();
+        const previousDetail = await previousRes.json();
+        if (currentView !== 'history') return;
+        const diff = diffSnapshotItems(previousDetail.issues, newestDetail.issues);
+        const slot = document.getElementById('history-diff-slot');
+        if (slot) slot.innerHTML = renderHistoryDiff(diff, previous.uploadedAt, newest.uploadedAt);
+      } catch (e) {
+        const slot = document.getElementById('history-diff-slot');
+        if (slot) slot.innerHTML = '';
+      }
+    }
+  }
+
+  function renderHistoryDiff(diff, fromDate, toDate) {
+    const { added, removed, statusChanged } = diff;
+    if (!added.length && !removed.length && !statusChanged.length) {
+      return `<div class="history-diff-section"><div class="history-diff-title">Since ${formatDateTime(fromDate)}</div><div class="history-diff-summary">No changes between these two uploads.</div></div>`;
+    }
+    const changeRows = statusChanged.map(c => `
+      <div class="history-diff-item">
+        <span class="status-pill ${c.from}">${STATUS_LABELS[c.from] || c.from}</span>
+        <span class="history-diff-arrow">&rarr;</span>
+        <span class="status-pill ${c.to}">${STATUS_LABELS[c.to] || c.to}</span>
+        <span class="history-diff-item-title">${c.item.title}</span>
+      </div>
+    `).join('');
+    const addedRows = added.map(i => `<div class="history-diff-item"><span class="status-pill ${i.status}">New</span><span class="history-diff-item-title">${i.title}</span></div>`).join('');
+    const removedRows = removed.map(i => `<div class="history-diff-item"><span class="status-pill closed">Removed</span><span class="history-diff-item-title">${i.title}</span></div>`).join('');
+    return `
+      <div class="history-diff-section">
+        <div class="history-diff-title">Since ${formatDateTime(fromDate)}</div>
+        <div class="history-diff-summary">${added.length} new &middot; ${removed.length} removed &middot; ${statusChanged.length} changed status</div>
+        ${statusChanged.length ? `<div class="history-diff-list">${changeRows}</div>` : ''}
+        ${added.length ? `<div class="history-diff-list">${addedRows}</div>` : ''}
+        ${removed.length ? `<div class="history-diff-list">${removedRows}</div>` : ''}
+      </div>
+    `;
+  }
+
+  function formatDateTime(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   }
 
   function render() {
@@ -1010,7 +1255,11 @@
     if (currentView === 'board') body.innerHTML = renderBoard(list);
     else if (currentView === 'table') body.innerHTML = renderTable(list);
     else if (currentView === 'calendar') body.innerHTML = renderCalendar(list);
-    else body.innerHTML = renderCompletedList(list);
+    else if (currentView === 'closed') body.innerHTML = renderClosedList(list);
+    else if (currentView === 'history') {
+      body.innerHTML = '<div class="empty">Loading history&hellip;</div>';
+      loadAndRenderHistory();
+    }
 
     body.querySelectorAll('[data-id]').forEach(el => {
       el.addEventListener('click', () => openModal(el.getAttribute('data-id')));
@@ -1226,12 +1475,392 @@
           </svg>
           <div class="diagram-caption">A push to GitHub triggers a fresh Cloudflare Worker deploy (top row — deploy time). Your browser talks to that running Worker, which checks your password/session, serves the tracker's HTML/JS, and reads and writes the shared issue list in the D1 database (bottom row — request time).</div>
         </div>
+        <div class="diagram-security">
+          <div class="diagram-security-title">How the password protection works</div>
+          <p class="diagram-security-text">Every request — including the API calls this tracker makes to load and save data — is checked by this Worker before anything is served. That check happens on the server, so it can't be bypassed by viewing page source the way a password built into client-side JavaScript could be.</p>
+          <p class="diagram-security-text">The password itself is stored as a Cloudflare secret and never appears anywhere in the code or this repository.</p>
+          <p class="diagram-security-text">A correct password sets a session cookie (HttpOnly, Secure, SameSite=Lax) whose value is an expiry timestamp plus an HMAC-SHA256 signature of that timestamp, generated using a separate signing secret. The Worker verifies this signature using a constant-time comparison (to avoid leaking timing information) and checks the expiry on every request, keeping you signed in for 30 days without re-entering the password.</p>
+          <p class="diagram-security-text">This is a single shared password for anyone who has it — there are no individual user accounts and no log of who signed in.</p>
+          <p class="diagram-security-text">The D1 database itself is not exposed to the internet directly — it's only reachable through the Worker's own code via a private binding, encrypted at rest by Cloudflare, and isolated to this Cloudflare account.</p>
+        </div>
       </div>
     `;
     ROOT.appendChild(backdrop);
     const close = () => backdrop.remove();
     backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(); });
     backdrop.querySelector('#diagram-close').addEventListener('click', close);
+  }
+
+  // ---------- Upload RAID Log (parses the source spreadsheet directly —
+  // .xlsx, .xls, or .csv — then transforms it into this tracker's issue
+  // format and records a historical snapshot of the result) ----------
+  //
+  // Columns are detected by matching HEADER TEXT, not by fixed position.
+  // This matters because different saved versions of the same RAID log
+  // have genuinely different column layouts (e.g. one export has a
+  // "DevOps" column and 22 total columns, another has no DevOps column
+  // at all and only 16) — a hardcoded position mapping silently misreads
+  // every field whenever that happens. Header-based detection adapts to
+  // whichever layout is actually in the uploaded file.
+
+  function normalizeHeader(s) {
+    return (s || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
+  }
+
+  // Fixed column positions, per your explicit specification — not detected
+  // from header text. Header-text detection was tried first but proved too
+  // fragile: the same underlying sheet has used different exact wording for
+  // the same column across versions (and sometimes reordered columns
+  // entirely), which caused silent misreads. These exact positions are the
+  // ones you confirmed to trust for every RAID Log upload going forward.
+  //   A: RAID # (kept for stable IDs across uploads — needed for the
+  //      History view's diffing to work; not one of your listed columns,
+  //      but every version of this sheet has had it in column A)
+  //   B: Dev Ops        E: Deployment Status   J: Description
+  //   K: Turnover to DG Target Date            M: Walmart Blocker
+  //   P: Priority       R: Owner
+  // Columns not listed (Type, Internal/External, Notes, Latest Comment,
+  // DG Priority) are intentionally not read.
+  const FIXED_RAID_COLUMNS = {
+    raidNumber: 0,   // A
+    devops: 1,       // B
+    status: 4,       // E
+    description: 9,  // J
+    targetDate: 10,  // K
+    blocker: 12,     // M
+    priority: 15,    // P
+    owner: 17,       // R
+  };
+
+  function detectColumnMap() {
+    // Always the same fixed positions — see FIXED_RAID_COLUMNS above.
+    return Object.assign({}, FIXED_RAID_COLUMNS);
+  }
+
+  function mapRaidStatus(raw) {
+    const s = (raw || '').toString().trim().toLowerCase();
+    // Order matters: check the more specific/distinguishing phrases
+    // before shorter substrings that could otherwise match too broadly.
+    if (s.indexOf('closed') !== -1) return 'closed';
+    if (s.indexOf('ready for customer') !== -1) return 'readycustomer';
+    if (s.indexOf('ready for install') !== -1) return 'readyinstall';
+    if (s.indexOf('in progress') !== -1) return 'inprogress';
+    // Both "Testing" and "Testing (PSO)" land in the same bucket.
+    if (s.indexOf('testing') !== -1) return 'testing';
+    if (s.indexOf('monitoring') !== -1) return 'monitoring';
+    if (s.indexOf('on hold') !== -1 || s.indexOf('onhold') !== -1) return 'onhold';
+    return 'open';
+  }
+
+  // Same lesson as mapRaidStatus: match loosely (any case, trimmed,
+  // single-letter or full-word) rather than requiring an exact "Yes"/"No"
+  // — real exported values vary (e.g. "yes", "Y", trailing spaces) and an
+  // exact match silently miscounted many genuine blockers as non-blockers.
+  function mapRaidBlocker(raw) {
+    const b = (raw || '').toString().trim().toLowerCase();
+    if (b === 'y/n' || b === 'yes/no') return 'Y/N';
+    if (b === 'yes' || b === 'y' || b === 'true' || b === '1') return 'Y';
+    if (b === 'no' || b === 'n' || b === 'false' || b === '0') return 'N';
+    return '';
+  }
+
+  // Recognizes a handful of common non-ISO date formats seen in real
+  // exports/pastes (e.g. "4-Aug" from a text-formatted Excel cell, or
+  // "08/14/26" from a plain paste) and normalizes them to ISO YYYY-MM-DD,
+  // so isLate() and the Missing Due Date filter treat them as real dates
+  // instead of lumping them in with genuine placeholders like "TBD".
+  // Returns null if the text isn't a recognized date format at all.
+  function parseFlexibleDate(raw) {
+    const s = (raw || '').toString().trim();
+    if (!s) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+    const pad = n => String(n).padStart(2, '0');
+    const normalizeYear = (yy) => {
+      if (yy.length === 4) return parseInt(yy, 10);
+      const n = parseInt(yy, 10);
+      return n < 50 ? 2000 + n : 1900 + n;
+    };
+
+    // MM/DD/YY or MM/DD/YYYY
+    let m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
+    if (m) {
+      const [, mm, dd, yy] = m;
+      return `${normalizeYear(yy)}-${pad(mm)}-${pad(dd)}`;
+    }
+
+    const months = { jan:1, feb:2, mar:3, apr:4, may:5, jun:6, jul:7, aug:8, sep:9, oct:10, nov:11, dec:12 };
+
+    // D-MMM-YY(YY) e.g. "4-Aug-26"
+    m = s.match(/^(\d{1,2})-([A-Za-z]{3,})-(\d{2}|\d{4})$/);
+    if (m && months[m[2].toLowerCase().slice(0,3)]) {
+      const month = months[m[2].toLowerCase().slice(0,3)];
+      return `${normalizeYear(m[3])}-${pad(month)}-${pad(m[1])}`;
+    }
+
+    // D-MMM with no year e.g. "4-Aug" — assume the current year, since
+    // these are near-term project dates, not historical records.
+    m = s.match(/^(\d{1,2})-([A-Za-z]{3,})$/);
+    if (m && months[m[2].toLowerCase().slice(0,3)]) {
+      const month = months[m[2].toLowerCase().slice(0,3)];
+      return `${new Date().getFullYear()}-${pad(month)}-${pad(m[1])}`;
+    }
+
+    return null;
+  }
+
+  function excelCellToDateString(val) {
+    if (val instanceof Date && !isNaN(val)) {
+      const pad = n => String(n).padStart(2, '0');
+      return `${val.getFullYear()}-${pad(val.getMonth() + 1)}-${pad(val.getDate())}`;
+    }
+    const raw = (val || '').toString().trim();
+    const parsed = parseFlexibleDate(raw);
+    return parsed || raw;
+  }
+
+  function transformRaidRow(row, index) {
+    const raidNumber = (row.raidNumber || '').toString().trim();
+    const noteParts = [];
+    if (row.notes) noteParts.push(row.notes);
+    if (row.latestComment) noteParts.push('Latest comment: ' + row.latestComment);
+    return {
+      id: 'raid-' + (raidNumber || ('noid-' + index)),
+      raidNumber: raidNumber,
+      area: (row.type || 'General').toString().trim(),
+      title: (row.description || '').toString().trim() || 'Untitled item',
+      detail: (row.description || '').toString().trim(),
+      status: mapRaidStatus(row.status),
+      owner: (row.owner || '').toString().trim(),
+      devops: (row.devops || '').toString().trim(),
+      priority: (row.priority || '').toString().trim(),
+      blocker: mapRaidBlocker(row.blocker),
+      targetDate: excelCellToDateString(row.targetDate),
+      notes: noteParts.join('\n\n'),
+      reportedDate: '',
+    };
+  }
+
+  // Turns a 2D array of raw cell values (however we got it — SheetJS,
+  function isRaidHeaderCell(cell) {
+    const h = normalizeHeader(cell);
+    return h.indexOf('raid') === 0; // "RAID #", "RAID#", "RAID No.", etc.
+  }
+
+  // or a hand-parsed paste) into the intermediate row-object shape
+  // transformRaidRow() expects, skipping the header row and any blank
+  // separator rows (e.g. the "- Risks" section dividers in the source).
+  function rawRowsToRaidObjects(rows) {
+    // Find the header row: the one whose first cell starts with "RAID".
+    let headerIdx = rows.findIndex(r => isRaidHeaderCell(r[0]));
+    if (headerIdx === -1) headerIdx = 0; // fall back to assuming row 1 is the header
+
+    const cols = detectColumnMap(rows[headerIdx]);
+    const get = (r, field) => (cols[field] !== undefined ? r[cols[field]] : '');
+
+    const dataRows = rows.slice(headerIdx + 1);
+    const objects = [];
+    dataRows.forEach((r) => {
+      const raidNumber = (get(r, 'raidNumber') || '').toString().trim();
+      const description = (get(r, 'description') || '').toString().trim();
+      if (!description) return; // blank/separator row (section dividers use "-" in column A but never have a real description)
+      objects.push({
+        raidNumber,
+        devops: get(r, 'devops'),
+        internalExternal: get(r, 'internalExternal'),
+        type: get(r, 'type'),
+        status: get(r, 'status'),
+        blocker: get(r, 'blocker'),
+        description,
+        targetDate: get(r, 'targetDate'),
+        owner: get(r, 'owner'),
+        priority: get(r, 'priority'),
+        notes: get(r, 'notes'),
+        latestComment: get(r, 'latestComment'),
+      });
+    });
+    return objects;
+  }
+
+  // Parses an uploaded .xlsx/.xls/.csv file (as an ArrayBuffer) via
+  // SheetJS, picks the sheet that actually looks like the RAID log (the
+  // one containing a "RAID #"-style header — the workbook also has a
+  // summary sheet and a validation-list sheet we want to ignore), and
+  // returns the intermediate row-object array.
+  function parseSpreadsheetFile(arrayBuffer) {
+    const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: true });
+    for (const sheetName of workbook.SheetNames) {
+      const sheet = workbook.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: '' });
+      const headerIdx = rows.findIndex(r => isRaidHeaderCell(r[0]));
+      if (headerIdx !== -1) {
+        const columnMap = detectColumnMap(rows[headerIdx]);
+        return { objects: rawRowsToRaidObjects(rows), sheetName, columnMap };
+      }
+    }
+    return { objects: [], sheetName: null, columnMap: {} };
+  }
+
+  const RAID_FIELD_LABELS = {
+    raidNumber: 'RAID #', devops: 'DevOps', internalExternal: 'Internal/External', type: 'Type',
+    status: 'Status', blocker: 'Blocker', description: 'Description', targetDate: 'Target Date',
+    owner: 'Owner', priority: 'Priority', notes: 'Notes', latestComment: 'Latest Comment',
+  };
+
+  function describeColumnMap(columnMap) {
+    const found = Object.keys(RAID_FIELD_LABELS).filter(f => columnMap[f] !== undefined).map(f => RAID_FIELD_LABELS[f]);
+    const missing = Object.keys(RAID_FIELD_LABELS).filter(f => columnMap[f] === undefined).map(f => RAID_FIELD_LABELS[f]);
+    let text = 'Columns found: ' + (found.join(', ') || 'none');
+    if (missing.length) text += '. Not found: ' + missing.join(', ') + '.';
+    return text;
+  }
+
+  // Parses text pasted directly from Excel (selecting a range of cells
+  // and copying puts tab-separated values on the clipboard).
+  function parsePastedRows(text) {
+    const lines = text.split(/\r?\n/).filter(l => l.length > 0);
+    const rows = lines.map(l => l.split('\t'));
+    return rawRowsToRaidObjects(rows);
+  }
+
+  function openUploadRaidModal() {
+    let pendingObjects = null; // set once a file has been successfully parsed
+
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.innerHTML = `
+      <div class="modal" style="max-width:600px;">
+        <h2>Upload RAID Log</h2>
+        <p style="font-size:13px;line-height:1.5;color:var(--ink-soft);margin:0 0 10px;">
+          Choose the RAID log spreadsheet directly (.xlsx, .xls, or .csv) — no need to convert
+          anything first.
+        </p>
+        <div class="field">
+          <label>Snapshot date — when was this RAID log exported/current as of?</label>
+          <input type="date" id="raid-modal-date" value="${todayISO()}">
+          <p style="font-size:12px;color:var(--ink-soft);margin:6px 0 0;">
+            Today's date: replaces your current tracker data and records this upload in History.
+            A past date: adds a historical record to History only — your current tracker data
+            stays as-is.
+          </p>
+        </div>
+        <div class="field">
+          <label>Choose file</label>
+          <input type="file" id="raid-modal-file" accept=".xlsx,.xls,.csv">
+          <p id="raid-modal-file-status" style="font-size:12px;color:var(--ink-soft);margin:6px 0 0;"></p>
+        </div>
+        <div class="field">
+          <label>Or paste copied rows from Excel here (select the rows, Ctrl+C, paste below)</label>
+          <textarea id="raid-modal-textarea" placeholder="Paste copied Excel rows here..." style="width:100%;height:140px;font-family:monospace;font-size:11.5px;padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--paper);resize:vertical;"></textarea>
+        </div>
+        <p id="raid-modal-error" style="font-size:12.5px;color:var(--rust);margin:0 0 8px;display:none;"></p>
+        <div class="modal-actions" style="justify-content:flex-end;gap:8px;">
+          <button class="btn-secondary" id="raid-cancel">Cancel</button>
+          <button class="btn-primary" id="raid-load">Upload</button>
+        </div>
+      </div>
+    `;
+    ROOT.appendChild(backdrop);
+    const close = () => backdrop.remove();
+    backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(); });
+    backdrop.querySelector('#raid-cancel').addEventListener('click', close);
+
+    const fileInput = backdrop.querySelector('#raid-modal-file');
+    const textarea = backdrop.querySelector('#raid-modal-textarea');
+    const dateInput = backdrop.querySelector('#raid-modal-date');
+    const errorEl = backdrop.querySelector('#raid-modal-error');
+    const fileStatusEl = backdrop.querySelector('#raid-modal-file-status');
+
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files[0];
+      if (!file) return;
+      errorEl.style.display = 'none';
+      fileStatusEl.textContent = 'Reading file…';
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const { objects, sheetName, columnMap } = parseSpreadsheetFile(reader.result);
+          if (!objects.length) {
+            pendingObjects = null;
+            fileStatusEl.textContent = '';
+            errorEl.textContent = 'Could not find a "RAID #" column in any sheet of this file. Make sure this is the RAID log spreadsheet.';
+            errorEl.style.display = 'block';
+            return;
+          }
+          pendingObjects = objects;
+          fileStatusEl.innerHTML = `Found ${objects.length} row(s) in sheet "${sheetName}". Click Upload to continue.<br><span style="opacity:0.8;">${describeColumnMap(columnMap)}</span>`;
+        } catch (e) {
+          pendingObjects = null;
+          fileStatusEl.textContent = '';
+          errorEl.textContent = 'Could not read that file as a spreadsheet — try a .xlsx, .xls, or .csv export, or use the paste option below.';
+          errorEl.style.display = 'block';
+        }
+      };
+      reader.onerror = () => {
+        pendingObjects = null;
+        fileStatusEl.textContent = '';
+        errorEl.textContent = 'Could not read that file — try pasting rows into the box below instead.';
+        errorEl.style.display = 'block';
+      };
+      reader.readAsArrayBuffer(file);
+    });
+
+    backdrop.querySelector('#raid-load').addEventListener('click', () => {
+      let objects = pendingObjects;
+      if (!objects) {
+        const pasted = textarea.value.trim();
+        if (!pasted) {
+          errorEl.textContent = 'Choose a file above, or paste copied rows into the box before uploading.';
+          errorEl.style.display = 'block';
+          return;
+        }
+        objects = parsePastedRows(pasted);
+        if (!objects.length) {
+          errorEl.textContent = 'Could not find any RAID log rows in the pasted text.';
+          errorEl.style.display = 'block';
+          return;
+        }
+      }
+      const snapshotDate = dateInput.value || todayISO();
+      const isHistorical = snapshotDate !== todayISO();
+      const transformed = objects.map((row, i) => transformRaidRow(row, i));
+      close();
+
+      const confirmMessage = isHistorical
+        ? `Record this as a historical RAID log snapshot dated ${formatDate(snapshotDate)}? This adds ${transformed.length} item(s) to History only — it will NOT change your current tracker data.`
+        : `Upload ${transformed.length} item(s) from this RAID log? This will replace all ${issues.length} item(s) currently in the tracker.`;
+
+      showConfirmModal(
+        confirmMessage,
+        async () => {
+          const snapshotIso = new Date(snapshotDate + 'T12:00:00').toISOString();
+          if (isHistorical) {
+            // History-only: don't touch the live tracker data.
+            await saveSnapshot(transformed, snapshotIso);
+            if (currentView === 'history') loadAndRenderHistory();
+          } else {
+            issues = transformed;
+            await saveIssues(snapshotDate);
+            await saveSnapshot(issues, snapshotIso);
+            populateFilters();
+            render();
+          }
+        },
+        'Upload'
+      );
+    });
+  }
+
+  async function saveSnapshot(issuesToSnapshot, uploadedAt) {
+    try {
+      await fetch('/api/snapshots', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ issues: issuesToSnapshot, uploadedAt }),
+      });
+    } catch (e) {
+      console.error('Snapshot save failed', e);
+    }
   }
 
   function parseAndValidateImport(text) {
@@ -1319,12 +1948,13 @@
           await saveIssues();
           populateFilters();
           render();
-        }
+        },
+        'Import'
       );
     });
   }
 
-  function showConfirmModal(message, onConfirm) {
+  function showConfirmModal(message, onConfirm, confirmLabel) {
     const backdrop = document.createElement('div');
     backdrop.className = 'modal-backdrop';
     backdrop.innerHTML = `
@@ -1333,7 +1963,7 @@
         <p style="font-size:13.5px;line-height:1.5;color:var(--ink-soft);margin:0 0 18px;">${message}</p>
         <div class="modal-actions" style="justify-content:flex-end;gap:8px;">
           <button class="btn-secondary" id="confirm-cancel">Cancel</button>
-          <button class="btn-primary" id="confirm-ok">Import</button>
+          <button class="btn-primary" id="confirm-ok">${confirmLabel || 'OK'}</button>
         </div>
       </div>
     `;
@@ -1364,14 +1994,18 @@
         const statusDiff = STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status);
         return statusDiff !== 0 ? statusDiff : a.title.localeCompare(b.title);
       }).map(i => {
-        return [i.area, i.title, i.detail, i.devops || '\u2014', i.priority || '\u2014', i.blocker || '\u2014', i.reportedDate ? formatDate(i.reportedDate) : '\u2014', i.targetDate ? formatDate(i.targetDate) : '\u2014', i.notes || '\u2014', i.owner || '\u2014', statusText(i.status)].join('\t');
+        return [i.title, i.detail, i.devops || '\u2014', i.priority || '\u2014', i.blocker || '\u2014', i.reportedDate ? formatDate(i.reportedDate) : '\u2014', i.targetDate ? formatDate(i.targetDate) : '\u2014', i.notes || '\u2014', i.owner || '\u2014', statusText(i.status)].join('\t');
       });
-      const cols = ['Area', 'Title', 'Detail', 'DevOps #', 'Priority', 'Walmart Blocker', 'Reported', 'Target', 'Notes', 'Owner', 'Status'].join('\t');
+      const cols = ['Title', 'Detail', 'DevOps #', 'Priority', 'Walmart Blocker', 'Reported', 'Target', 'Notes', 'Owner', 'Status'].join('\t');
       return header + '\n' + cols + '\n' + rows.join('\n');
     }
 
-    // board view (grouped by status)
-    const blocks = STATUS_ORDER.map(st => {
+    // Board view groups by only the 5 Board statuses (matching what's on
+    // screen); other views that fall through here (Closed, Calendar,
+    // History) still group by the full status list so their own items
+    // (e.g. Closed) aren't silently dropped.
+    const groupOrder = currentView === 'board' ? BOARD_STATUS_ORDER : STATUS_ORDER;
+    const blocks = groupOrder.map(st => {
       const items = list.filter(i => i.status === st);
       if (!items.length) return null;
       const lines = items.map(i => formatIssueLine(i));
@@ -1381,14 +2015,14 @@
   }
 
   function formatIssueLine(i) {
+    const devopsPrefix = i.devops ? `DevOps #${i.devops} — ` : '';
     const owner = i.owner ? `  |  ${i.owner}` : '';
-    const devops = i.devops ? `  |  DevOps #${i.devops}` : '';
     const priority = i.priority ? `  |  ${i.priority} priority` : '';
     const blocker = isBlocker(i.blocker) ? `  |  WALMART BLOCKER${i.blocker === 'Y/N' ? ' (Y/N)' : ''}` : '';
     const reported = i.reportedDate ? `  |  Reported: ${formatDate(i.reportedDate)}` : '';
     const target = i.targetDate ? `  |  Target: ${formatDate(i.targetDate)}` : '';
     const notes = i.notes ? `\nNotes: ${i.notes}` : '';
-    return `[${i.area}]${devops} ${i.title}\n${i.detail}${owner}${priority}${blocker}${reported}${target}${notes}`;
+    return `${devopsPrefix}${i.title}\n${i.detail}${owner}${priority}${blocker}${reported}${target}${notes}`;
   }
 
   // Colors mirrored from the app's CSS variables, hardcoded here since inline
@@ -1401,8 +2035,10 @@
     moss: '#4a6b4d', mossBg: '#e7efe4',
     slate: '#6b7280', slateBg: '#eceae2',
     teal: '#1f7a72', tealBg: '#daf0ee',
+    plum: '#6b4fa0', plumBg: '#f2ecfb',
+    forest: '#2f6b3a', forestBg: '#e2f0e4',
   };
-  const STATUS_EMAIL_COLOR = { open: 'rust', inprogress: 'amber', testing: 'steel', readyinstall: 'slate', readycustomer: 'moss', completed: 'teal' };
+  const STATUS_EMAIL_COLOR = { open: 'rust', inprogress: 'amber', testing: 'steel', readycustomer: 'moss', readyinstall: 'slate', monitoring: 'plum', onhold: 'forest', closed: 'teal' };
 
   function esc(s) {
     return String(s == null ? '' : s)
@@ -1459,7 +2095,6 @@
         const statusBg = EMAIL_COLORS[STATUS_EMAIL_COLOR[i.status] + 'Bg'];
         return `
           <tr>
-            <td style="padding:8px 10px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;font-size:12.5px;">${esc(i.area)}</td>
             <td style="padding:8px 10px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;">
               <div style="font-weight:700;font-size:13px;color:${EMAIL_COLORS.ink};">${esc(i.title)}</div>
               <div style="font-size:12px;color:${EMAIL_COLORS.inkSoft};margin-top:2px;">${escNl(i.detail)}</div>
@@ -1480,20 +2115,22 @@
         <div style="${font}">
           ${headerHtml}
           <table style="border-collapse:collapse;width:100%;">
-            <thead><tr>${th('Area')}${th('Issue')}${th('DevOps #')}${th('Priority')}${th('Walmart Blocker')}${th('Reported')}${th('Target')}${th('Owner')}${th('Status')}</tr></thead>
+            <thead><tr>${th('Issue')}${th('DevOps #')}${th('Priority')}${th('Walmart Blocker')}${th('Reported')}${th('Target')}${th('Owner')}${th('Status')}</tr></thead>
             <tbody>${rowsHtml}</tbody>
           </table>
         </div>`;
     }
 
-    // board view (grouped by status) -> a labeled table per status group
-    const sections = STATUS_ORDER.map(st => {
+    // Board view groups by only the 5 Board statuses (matching what's on
+    // screen); other views that fall through here still group by the
+    // full status list so their own items aren't silently dropped.
+    const groupOrder = currentView === 'board' ? BOARD_STATUS_ORDER : STATUS_ORDER;
+    const sections = groupOrder.map(st => {
       const items = list.filter(i => i.status === st);
       if (!items.length) return '';
       const color = EMAIL_COLORS[STATUS_EMAIL_COLOR[st]];
       const rowsHtml = items.map(i => `
         <tr>
-          <td style="padding:10px 12px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;width:120px;font-size:12.5px;color:${EMAIL_COLORS.inkSoft};">${esc(i.area)}</td>
           <td style="padding:10px 12px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;">
             <div style="font-weight:700;font-size:13.5px;color:${EMAIL_COLORS.ink};">${esc(i.title)}</div>
             <div style="margin:4px 0;">${issueMetaHtml(i)}</div>
@@ -1600,16 +2237,13 @@
 
   function openModal(id) {
     editingId = id || null;
-    const issue = id ? issues.find(i => i.id === id) : { area:'', title:'', detail:'', status: STATUS_ORDER[0], owner:'', devops:'', priority:'', blocker:'', targetDate:'', notes:'', reportedDate: todayISO() };
+    const issue = id ? issues.find(i => i.id === id) : { title:'', detail:'', status: STATUS_ORDER[0], owner:'', devops:'', priority:'', blocker:'', targetDate:'', notes:'', reportedDate: todayISO() };
     const backdrop = document.createElement('div');
     backdrop.className = 'modal-backdrop';
     backdrop.innerHTML = `
       <div class="modal">
         <h2>${id ? 'Edit issue' : 'Add issue'}</h2>
-        <div class="field-row">
-          <div class="field"><label>Area</label><input type="text" id="m-area" value="${issue.area}" placeholder="e.g. Exotec, Packing"></div>
-          <div class="field"><label>Owner</label><input type="text" id="m-owner" value="${issue.owner||''}" placeholder="optional"></div>
-        </div>
+        <div class="field"><label>Owner</label><input type="text" id="m-owner" value="${issue.owner||''}" placeholder="optional"></div>
         <div class="field"><label>Title</label><input type="text" id="m-title" value="${issue.title}" placeholder="Short summary"></div>
         <div class="field"><label>Detail</label><textarea id="m-detail" placeholder="Full description">${issue.detail}</textarea></div>
         <div class="field-row">
@@ -1668,7 +2302,6 @@
     }
     document.getElementById('m-save').addEventListener('click', async () => {
       const data = {
-        area: document.getElementById('m-area').value.trim() || 'General',
         title: document.getElementById('m-title').value.trim(),
         detail: document.getElementById('m-detail').value.trim(),
         status: document.getElementById('m-status').value,
@@ -1696,12 +2329,11 @@
   }
 
   // Event bindings
-  document.getElementById('btn-add').addEventListener('click', () => openModal(null));
   document.getElementById('btn-copy-view').addEventListener('click', copyCurrentView);
   document.getElementById('btn-export').addEventListener('click', exportData);
   document.getElementById('btn-network-diagram').addEventListener('click', openNetworkDiagramModal);
   document.getElementById('btn-import').addEventListener('click', openImportModal);
-  document.getElementById('filter-area').addEventListener('change', render);
+  document.getElementById('btn-upload-raid').addEventListener('click', openUploadRaidModal);
   document.getElementById('filter-status').addEventListener('change', render);
   document.getElementById('filter-blocker').addEventListener('change', render);
   document.getElementById('filter-missing').addEventListener('change', render);
@@ -1729,3 +2361,6 @@
   })();
 })();
 </script>
+
+</body>
+</html>
