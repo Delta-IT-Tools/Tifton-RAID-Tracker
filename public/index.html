@@ -1664,7 +1664,15 @@
     dataRows.forEach((r) => {
       const raidNumber = (get(r, 'raidNumber') || '').toString().trim();
       const description = (get(r, 'description') || '').toString().trim();
-      if (!description) return; // blank/separator row (section dividers use "-" in column A but never have a real description)
+      // Section-divider rows (marking the start of "Risks"/"Actions"/etc.
+      // groupings in the source sheet) always use a lone "-" in the RAID #
+      // column. Checking for that directly is more reliable than checking
+      // for a blank description — in some file layouts the divider's
+      // section label (e.g. "Risks") lands in the description column
+      // position, which would otherwise let it slip through as a real
+      // item with a blank status (defaulting to "Open").
+      if (raidNumber === '-') return;
+      if (!description) return; // blank/separator row
       objects.push({
         raidNumber,
         devops: get(r, 'devops'),
