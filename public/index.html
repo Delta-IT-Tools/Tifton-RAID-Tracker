@@ -138,9 +138,45 @@
   #tifton-tracker .toolbar-search {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: 12px;
   }
+  #tifton-tracker .active-filters {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+  #tifton-tracker .filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--steel);
+    background: var(--steel-bg);
+    border-radius: 999px;
+    padding: 4px 6px 4px 10px;
+    white-space: nowrap;
+  }
+  #tifton-tracker .filter-chip.late-chip { color: var(--amber); background: var(--amber-bg); }
+  #tifton-tracker .filter-chip-x {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+    padding: 0;
+  }
+  #tifton-tracker .filter-chip-x:hover { background: rgba(0,0,0,0.12); }
   #tifton-tracker select, #tifton-tracker input[type=text] {
     font-family: inherit;
     font-size: 13px;
@@ -734,6 +770,7 @@
     </div>
     <div class="toolbar-search">
       <input type="text" id="search" placeholder="Search issues...">
+      <div class="active-filters" id="active-filters"></div>
       <div class="view-toggle" id="view-toggle">
         <button data-view="board" class="active">Board</button>
         <button data-view="table">Table</button>
@@ -922,6 +959,40 @@
     const el = document.getElementById('header-summary');
     const n = issues.length;
     el.textContent = n === 0 ? 'No issues yet' : `${n} tracked issue${n === 1 ? '' : 's'}`;
+  }
+
+  function renderActiveFilters() {
+    const container = document.getElementById('active-filters');
+    const status = document.getElementById('filter-status').value;
+    const blocker = document.getElementById('filter-blocker').value;
+    const missing = document.getElementById('filter-missing').value;
+    const search = document.getElementById('search').value;
+
+    const chips = [];
+    if (status) chips.push({ key: 'status', label: STATUS_LABELS[status] || status });
+    if (blocker === 'Y') chips.push({ key: 'blocker', label: 'Walmart blocker only' });
+    if (blocker === 'N') chips.push({ key: 'blocker', label: 'Not a blocker' });
+    if (missing === 'devops') chips.push({ key: 'missing', label: 'Missing DevOps #' });
+    if (missing === 'target') chips.push({ key: 'missing', label: 'Missing Due Date' });
+    if (missing === 'either') chips.push({ key: 'missing', label: 'Missing DevOps # or Due Date' });
+    if (lateFilterActive) chips.push({ key: 'late', label: 'Late', late: true });
+    if (search.trim()) chips.push({ key: 'search', label: `Search: "${search.trim()}"` });
+
+    container.innerHTML = chips.map(c =>
+      `<span class="filter-chip${c.late ? ' late-chip' : ''}">${c.label}<button type="button" class="filter-chip-x" data-key="${c.key}" title="Remove this filter">&times;</button></span>`
+    ).join('');
+
+    container.querySelectorAll('.filter-chip-x').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const key = btn.getAttribute('data-key');
+        if (key === 'status') document.getElementById('filter-status').value = '';
+        else if (key === 'blocker') document.getElementById('filter-blocker').value = '';
+        else if (key === 'missing') document.getElementById('filter-missing').value = '';
+        else if (key === 'late') lateFilterActive = false;
+        else if (key === 'search') document.getElementById('search').value = '';
+        render();
+      });
+    });
   }
 
   function formatDate(iso) {
@@ -1308,6 +1379,7 @@
   function render() {
     renderStats();
     renderHeaderSummary();
+    renderActiveFilters();
     const list = getFiltered();
     const body = document.getElementById('body');
     if (currentView === 'board') body.innerHTML = renderBoard(list);
