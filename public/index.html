@@ -671,6 +671,52 @@
   }
   #tifton-tracker .history-delete-btn:hover { background: var(--rust-bg); color: var(--rust); }
   #tifton-tracker .history-hint { font-size: 12.5px; color: var(--ink-soft); margin: -6px 0 12px; }
+
+  /* Analysis view */
+  #tifton-tracker .analysis-wrap { display: flex; flex-direction: column; gap: 16px; }
+  #tifton-tracker .analysis-header {
+    font-family: 'Oswald', sans-serif;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  #tifton-tracker .analysis-header .count { font-weight: 400; color: var(--ink-soft); }
+  #tifton-tracker .analysis-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  #tifton-tracker .analysis-card-title {
+    font-family: 'Oswald', sans-serif;
+    font-size: 14.5px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 10px;
+  }
+  #tifton-tracker .analysis-card-title .count { font-weight: 400; color: var(--ink-soft); font-size: 13px; }
+  #tifton-tracker .chart-wrap { width: 100%; }
+  #tifton-tracker .chart-legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px; }
+  #tifton-tracker .chart-legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink); }
+  #tifton-tracker .chart-legend-swatch { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  #tifton-tracker .analysis-stat-row { display: flex; gap: 20px; flex-wrap: wrap; }
+  #tifton-tracker .analysis-stat { flex: 1; min-width: 140px; }
+  #tifton-tracker .analysis-stat-n { font-family: 'Oswald', sans-serif; font-size: 26px; font-weight: 700; color: var(--steel); }
+  #tifton-tracker .analysis-stat-l { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+  #tifton-tracker .stuck-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  #tifton-tracker .stuck-table thead th {
+    text-align: left;
+    font-family: 'Oswald', sans-serif;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ink-soft);
+    padding: 6px 10px;
+    border-bottom: 2px solid var(--line);
+  }
+  #tifton-tracker .stuck-table tbody td { padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  #tifton-tracker .stuck-table tbody tr { cursor: pointer; }
+  #tifton-tracker .stuck-table tbody tr:hover { background: var(--paper); }
   #tifton-tracker .history-row.clickable { cursor: pointer; }
   #tifton-tracker .history-row.clickable:hover { background: var(--paper); }
   #tifton-tracker .history-row.expanded { background: var(--paper); }
@@ -777,6 +823,7 @@
         <button data-view="calendar">Calendar</button>
         <button data-view="closed">Closed</button>
         <button data-view="history">History</button>
+        <button data-view="analysis">Analysis</button>
       </div>
     </div>
   </div>
@@ -1376,6 +1423,238 @@
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   }
 
+  function shortDateLabel(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+
+  // ---------- Analysis (trend charts, closure velocity, stuck items) ----------
+
+  // A minimal hand-rolled SVG line chart — no charting library dependency,
+  // since this needs to keep working as a single self-contained file.
+  // Assumes every series shares the same x positions (one point per
+  // upload, evenly spaced by index rather than true elapsed time — good
+  // enough for "is this trending up or down", and avoids the complexity
+  // of a real time-scaled axis for what's usually a handful of uploads).
+  function renderLineChartSVG(series, xLabels) {
+    const width = 640, height = 220;
+    const padL = 42, padR = 16, padT = 16, padB = 28;
+    const plotW = width - padL - padR;
+    const plotH = height - padT - padB;
+    const n = xLabels.length;
+
+    let yMax = 0;
+    series.forEach(s => s.points.forEach(v => { if (v > yMax) yMax = v; }));
+    const rawStep = Math.max(1, yMax * 1.15) / 4;
+    const mag = Math.pow(10, Math.floor(Math.log10(rawStep || 1)));
+    const step = Math.max(1, Math.ceil(rawStep / mag) * mag);
+    yMax = step * 4;
+
+    const xAt = (i) => n <= 1 ? padL + plotW / 2 : padL + (plotW * i) / (n - 1);
+    const yAt = (v) => padT + plotH - (plotH * v) / yMax;
+
+    let gridLines = '';
+    for (let g = 0; g <= 4; g++) {
+      const v = step * g;
+      const y = yAt(v);
+      gridLines += `<line x1="${padL}" y1="${y}" x2="${width - padR}" y2="${y}" stroke="#dcd8cc" stroke-width="1"/>`;
+      gridLines += `<text x="${padL - 8}" y="${y + 4}" font-size="11" fill="#565f6c" text-anchor="end">${Math.round(v)}</text>`;
+    }
+
+    let xTicks = '';
+    const tickEvery = n > 8 ? Math.ceil(n / 8) : 1;
+    xLabels.forEach((lbl, i) => {
+      if (i % tickEvery !== 0 && i !== n - 1) return;
+      xTicks += `<text x="${xAt(i)}" y="${height - 8}" font-size="10.5" fill="#565f6c" text-anchor="middle">${lbl}</text>`;
+    });
+
+    let lines = '';
+    let legend = '';
+    series.forEach((s) => {
+      const pts = s.points.map((v, i) => `${xAt(i)},${yAt(v)}`).join(' ');
+      lines += `<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+      s.points.forEach((v, i) => { lines += `<circle cx="${xAt(i)}" cy="${yAt(v)}" r="3" fill="${s.color}"/>`; });
+      legend += `<span class="chart-legend-item"><span class="chart-legend-swatch" style="background:${s.color};"></span>${s.name}</span>`;
+    });
+
+    return `
+      <div class="chart-wrap">
+        <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;max-width:${width}px;display:block;">
+          ${gridLines}
+          <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT + plotH}" stroke="#565f6c" stroke-width="1"/>
+          <line x1="${padL}" y1="${padT + plotH}" x2="${width - padR}" y2="${padT + plotH}" stroke="#565f6c" stroke-width="1"/>
+          ${lines}
+          ${xTicks}
+        </svg>
+        <div class="chart-legend">${legend}</div>
+      </div>
+    `;
+  }
+
+  async function loadAndRenderAnalysis() {
+    const body = document.getElementById('body');
+    let snapshots;
+    try {
+      const res = await fetch('/api/snapshots');
+      if (!res.ok) throw new Error('Failed to load: ' + res.status);
+      const payload = await res.json();
+      snapshots = payload.snapshots || [];
+    } catch (e) {
+      if (currentView === 'analysis') body.innerHTML = '<div class="empty">Could not load upload history for analysis.</div>';
+      return;
+    }
+    if (currentView !== 'analysis') return;
+
+    if (snapshots.length < 2) {
+      body.innerHTML = `
+        <div class="analysis-wrap">
+          <div class="analysis-header">Analysis</div>
+          <div class="empty">Need at least 2 uploads to show trends. Upload another RAID log to start building this out.</div>
+        </div>
+      `;
+      return;
+    }
+
+    body.innerHTML = '<div class="empty">Crunching item-level history&hellip;</div>';
+
+    let details;
+    try {
+      details = await Promise.all(snapshots.map(s => fetch('/api/snapshots/' + s.id).then(r => r.json())));
+    } catch (e) {
+      if (currentView === 'analysis') body.innerHTML = '<div class="empty">Could not load item-level history for analysis.</div>';
+      return;
+    }
+    if (currentView !== 'analysis') return;
+
+    const detailById = {};
+    details.forEach(d => { if (d && d.id) detailById[d.id] = d; });
+
+    // Chronological order (oldest first) for trend/velocity computation —
+    // the History view sorts newest-first, but trends read naturally left
+    // (past) to right (present).
+    const chrono = snapshots.slice().sort((a, b) => new Date(a.uploadedAt) - new Date(b.uploadedAt));
+    const xLabels = chrono.map(s => shortDateLabel(s.uploadedAt));
+
+    // 1. Status trend lines
+    const trendKeys = [
+      { key: 'open', label: 'Open', color: '#a3402f' },
+      { key: 'inprogress', label: 'In Progress', color: '#c4791f' },
+      { key: 'testing', label: 'Testing', color: '#3d5a73' },
+      { key: 'closed', label: 'Closed', color: '#1f7a72' },
+    ];
+    const trendSeries = trendKeys.map(tk => ({
+      name: tk.label,
+      color: tk.color,
+      points: chrono.map(s => (s.statusCounts && s.statusCounts[tk.key]) || 0),
+    }));
+
+    // 4/7. Blocker count over time — not in statusCounts, so this needs
+    // the full item list per snapshot (already fetched above).
+    const blockerPoints = chrono.map(s => {
+      const d = detailById[s.id];
+      return d ? d.issues.filter(i => isBlocker(i.blocker)).length : 0;
+    });
+
+    // 5. Closure velocity — how many items newly became Closed between
+    // each consecutive pair of uploads.
+    const closuresPerInterval = [];
+    for (let i = 1; i < chrono.length; i++) {
+      const prevDetail = detailById[chrono[i - 1].id];
+      const curDetail = detailById[chrono[i].id];
+      if (!prevDetail || !curDetail) { closuresPerInterval.push(0); continue; }
+      const diff = diffSnapshotItems(prevDetail.issues, curDetail.issues);
+      closuresPerInterval.push(diff.statusChanged.filter(c => c.to === 'closed').length);
+    }
+    const totalClosures = closuresPerInterval.reduce((a, b) => a + b, 0);
+    const avgClosures = closuresPerInterval.length ? totalClosures / closuresPerInterval.length : 0;
+    const currentOpenCount = issues.filter(i => i.status !== 'closed').length;
+    const projectedUploads = avgClosures > 0 ? Math.ceil(currentOpenCount / avgClosures) : null;
+
+    // 2. Stuck items — for each currently-open issue, walk backward
+    // through uploads (newest to oldest) and count how many consecutive
+    // uploads it's held its CURRENT status. Only surfaced once an item
+    // has persisted across at least 2 uploads, so a single upload's
+    // items don't all show up as "stuck" on day one.
+    const newestFirst = chrono.slice().reverse();
+    const stuckItems = issues
+      .filter(i => i.status !== 'closed')
+      .map(issue => {
+        let streak = 0;
+        let sinceDate = null;
+        for (const snap of newestFirst) {
+          const d = detailById[snap.id];
+          if (!d) break;
+          const match = d.issues.find(x => x.id === issue.id);
+          if (!match || match.status !== issue.status) break;
+          streak++;
+          sinceDate = snap.uploadedAt;
+        }
+        const days = sinceDate ? Math.round((Date.now() - new Date(sinceDate)) / 86400000) : null;
+        return { issue, streak, sinceDate, days };
+      })
+      .filter(s => s.streak >= 2)
+      .sort((a, b) => b.streak - a.streak);
+
+    const closureHtml = `
+      <div class="analysis-card">
+        <div class="analysis-card-title">Closure Velocity</div>
+        <div class="analysis-stat-row">
+          <div class="analysis-stat"><div class="analysis-stat-n">${avgClosures.toFixed(1)}</div><div class="analysis-stat-l">Avg. closures per upload</div></div>
+          <div class="analysis-stat"><div class="analysis-stat-n">${totalClosures}</div><div class="analysis-stat-l">Total closed across all uploads</div></div>
+          <div class="analysis-stat"><div class="analysis-stat-n">${projectedUploads !== null ? '~' + projectedUploads : '&mdash;'}</div><div class="analysis-stat-l">Projected uploads to clear ${currentOpenCount} current Open item(s)</div></div>
+        </div>
+      </div>
+    `;
+
+    const stuckHtml = stuckItems.length ? `
+      <div class="analysis-card">
+        <div class="analysis-card-title">Stuck Items <span class="count">(${stuckItems.length})</span></div>
+        <p class="history-hint">Items that have held the same status across multiple uploads &mdash; click one to open it.</p>
+        <table class="stuck-table">
+          <thead><tr><th>Issue</th><th>Status</th><th>Owner</th><th>Since</th><th>Uploads</th><th>Days</th></tr></thead>
+          <tbody>
+            ${stuckItems.map(s => `
+              <tr data-id="${s.issue.id}">
+                <td>${s.issue.title}</td>
+                <td><span class="status-pill ${s.issue.status}">${STATUS_LABELS[s.issue.status] || s.issue.status}</span></td>
+                <td>${s.issue.owner || '&mdash;'}</td>
+                <td>${formatDate(s.sinceDate ? s.sinceDate.slice(0,10) : '')}</td>
+                <td>${s.streak}</td>
+                <td>${s.days}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    ` : `
+      <div class="analysis-card">
+        <div class="analysis-card-title">Stuck Items</div>
+        <div class="empty">No items have persisted in the same status across multiple uploads yet.</div>
+      </div>
+    `;
+
+    body.innerHTML = `
+      <div class="analysis-wrap">
+        <div class="analysis-header">Analysis <span class="count">(across ${chrono.length} uploads)</span></div>
+        <div class="analysis-card">
+          <div class="analysis-card-title">Status Trends</div>
+          ${renderLineChartSVG(trendSeries, xLabels)}
+        </div>
+        <div class="analysis-card">
+          <div class="analysis-card-title">Walmart Blockers Over Time</div>
+          ${renderLineChartSVG([{ name: 'Walmart Blockers', color: '#a3402f', points: blockerPoints }], xLabels)}
+        </div>
+        ${closureHtml}
+        ${stuckHtml}
+      </div>
+    `;
+
+    body.querySelectorAll('.stuck-table tbody tr').forEach(tr => {
+      tr.addEventListener('click', () => openModal(tr.getAttribute('data-id')));
+    });
+  }
+
   function render() {
     renderStats();
     renderHeaderSummary();
@@ -1389,6 +1668,10 @@
     else if (currentView === 'history') {
       body.innerHTML = '<div class="empty">Loading history&hellip;</div>';
       loadAndRenderHistory();
+    }
+    else if (currentView === 'analysis') {
+      body.innerHTML = '<div class="empty">Crunching upload history&hellip;</div>';
+      loadAndRenderAnalysis();
     }
 
     body.querySelectorAll('[data-id]').forEach(el => {
