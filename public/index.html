@@ -674,6 +674,8 @@
 
   /* Analysis view */
   #tifton-tracker .analysis-wrap { display: flex; flex-direction: column; gap: 16px; }
+  #tifton-tracker .analysis-chart-row { display: flex; gap: 16px; flex-wrap: wrap; }
+  #tifton-tracker .analysis-chart-row .analysis-card { flex: 1 1 320px; min-width: 0; margin-bottom: 0; }
   #tifton-tracker .analysis-header {
     font-family: 'Oswald', sans-serif;
     font-size: 17px;
@@ -1637,13 +1639,15 @@
     body.innerHTML = `
       <div class="analysis-wrap">
         <div class="analysis-header">Analysis <span class="count">(across ${chrono.length} uploads)</span></div>
-        <div class="analysis-card">
-          <div class="analysis-card-title">Status Trends</div>
-          ${renderLineChartSVG(trendSeries, xLabels)}
-        </div>
-        <div class="analysis-card">
-          <div class="analysis-card-title">Walmart Blockers Over Time</div>
-          ${renderLineChartSVG([{ name: 'Walmart Blockers', color: '#a3402f', points: blockerPoints }], xLabels)}
+        <div class="analysis-chart-row">
+          <div class="analysis-card">
+            <div class="analysis-card-title">Status Trends</div>
+            ${renderLineChartSVG(trendSeries, xLabels)}
+          </div>
+          <div class="analysis-card">
+            <div class="analysis-card-title">Walmart Blockers Over Time</div>
+            ${renderLineChartSVG([{ name: 'Walmart Blockers', color: '#a3402f', points: blockerPoints }], xLabels)}
+          </div>
         </div>
         ${closureHtml}
         ${stuckHtml}
