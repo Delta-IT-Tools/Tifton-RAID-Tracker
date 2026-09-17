@@ -424,6 +424,19 @@
     border-radius: 4px;
     white-space: nowrap;
   }
+  #tifton-tracker .card-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  #tifton-tracker .late-tag {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: white;
+    background: var(--amber);
+    padding: 2px 7px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  #tifton-tracker .card.is-late { border-left-color: var(--amber); box-shadow: inset 0 0 0 1px var(--amber-bg); }
   #tifton-tracker .meta-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
   #tifton-tracker .devops-tag {
     display: inline-block;
@@ -456,6 +469,11 @@
     background: #e4ebef;
     border-radius: 4px;
     padding: 1px 7px;
+  }
+  #tifton-tracker .target-tag.target-tag-late {
+    color: var(--rust);
+    background: var(--rust-bg);
+    font-weight: 700;
   }
   #tifton-tracker .card-detail {
     font-size: 12px;
@@ -1066,16 +1084,19 @@
   function cardHtml(issue) {
     const priorityClass = ['high','medium','low'].includes((issue.priority || '').toLowerCase()) ? issue.priority.toLowerCase() : '';
     const priorityLabel = priorityClass ? `${issue.priority} priority` : `Priority: ${issue.priority}`;
+    const late = isLate(issue);
     return `
-      <div class="card ${issue.status}" data-id="${issue.id}">
+      <div class="card ${issue.status}${late ? ' is-late' : ''}" data-id="${issue.id}">
         <div class="card-top">
-          ${isBlocker(issue.blocker) ? `<span class="blocker-tag">Walmart blocker${issue.blocker === 'Y/N' ? ' (Y/N)' : ''}</span>` : ''}
+          <div class="card-tags">
+            ${isBlocker(issue.blocker) ? `<span class="blocker-tag">Walmart blocker${issue.blocker === 'Y/N' ? ' (Y/N)' : ''}</span>` : ''}
+            ${late ? `<span class="late-tag">LATE</span>` : ''}
+          </div>
         </div>
         <div class="card-title">${issue.title}</div>
         <div class="meta-row">
-          ${issue.raidNumber ? `<span class="devops-tag">RAID #${issue.raidNumber}</span>` : ''}
           ${issue.priority ? `<span class="priority-tag ${priorityClass}">${priorityLabel}</span>` : ''}
-          ${issue.targetDate ? `<span class="target-tag">Target: ${formatDate(issue.targetDate)}</span>` : ''}
+          ${issue.targetDate ? `<span class="target-tag${late ? ' target-tag-late' : ''}">Target: ${formatDate(issue.targetDate)}</span>` : ''}
         </div>
         <div class="card-detail">${issue.detail}</div>
         <div class="card-footer">
