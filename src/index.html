@@ -1,0 +1,3234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TIFTON Go-Live Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  #tifton-tracker {
+    --ink: #1b2027;
+    --ink-soft: #565f6c;
+    --paper: #f3f1ea;
+    --panel: #ffffff;
+    --line: #dcd8cc;
+    --steel: #3d5a73;
+    --steel-dark: #2b4256;
+    --steel-bg: #e4ebef;
+    --amber: #c4791f;
+    --amber-bg: #fbeee0;
+    --rust: #a3402f;
+    --rust-bg: #f8e6e1;
+    --moss: #4a6b4d;
+    --moss-bg: #e7efe4;
+    --slate: #6b7280;
+    --slate-bg: #eceae2;
+    --teal: #1f7a72;
+    --teal-bg: #daf0ee;
+    --plum: #6b4fa0;
+    --plum-bg: #f2ecfb;
+    --forest: #2f6b3a;
+    --forest-bg: #e2f0e4;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    color: var(--ink);
+    background: linear-gradient(180deg, #9AC6E2 0%, #263138 100%);
+    border-radius: 10px;
+    padding: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  #tifton-tracker * { box-sizing: border-box; }
+  #tifton-tracker .head {
+    padding: 22px 24px 18px;
+    background-color: #334249;
+    border-radius: 10px 10px 0 0;
+    border-bottom: 2px solid #1b2027;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  #tifton-tracker .eyebrow {
+    font-family: 'Oswald', 'Arial Narrow', sans-serif;
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    color: #9AC6E2;
+    margin: 0 0 4px;
+    font-weight: 600;
+  }
+  #tifton-tracker h1 {
+    font-family: 'Oswald', 'Arial Narrow', sans-serif;
+    font-size: 30px;
+    font-weight: 600;
+    margin: 0;
+    letter-spacing: -0.01em;
+    line-height: 1.05;
+    color: #f3f1ea;
+  }
+  #tifton-tracker .head-sub {
+    font-size: 13px;
+    color: #c3d4da;
+    margin-top: 6px;
+  }
+  #tifton-tracker .stat-row {
+    display: flex;
+    gap: 0;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--panel);
+  }
+  #tifton-tracker .stat {
+    padding: 8px 16px;
+    text-align: center;
+    border-right: 1px solid var(--line);
+    min-width: 74px;
+  }
+  #tifton-tracker .stat:last-child { border-right: none; }
+  #tifton-tracker .stat .n { font-family: 'Oswald', sans-serif; font-size: 20px; font-weight: 600; line-height: 1; }
+  #tifton-tracker .stat .l { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); margin-top: 3px; }
+  #tifton-tracker .stat.open .n { color: var(--rust); }
+  #tifton-tracker .stat.inprogress .n { color: var(--amber); }
+  #tifton-tracker .stat.testing .n { color: var(--steel); }
+  #tifton-tracker .stat.readycustomer .n { color: var(--moss); }
+  #tifton-tracker .stat.readyinstall .n { color: var(--slate); }
+  #tifton-tracker .stat.monitoring .n { color: var(--plum); }
+  #tifton-tracker .stat.onhold .n { color: var(--forest); }
+  #tifton-tracker .stat.closed .n { color: var(--teal); }
+  #tifton-tracker .stat.late-stat {
+    cursor: pointer;
+    background: var(--amber-bg);
+    border-left: 2px solid var(--amber);
+  }
+  #tifton-tracker .stat.late-stat .n { color: var(--amber); }
+  #tifton-tracker .stat.late-stat .l { color: var(--amber); font-weight: 600; }
+  #tifton-tracker .stat.late-stat:hover { background: #f6ddb8; }
+  #tifton-tracker .stat.late-stat.active { background: var(--amber); }
+  #tifton-tracker .stat.late-stat.active .n,
+  #tifton-tracker .stat.late-stat.active .l { color: white; }
+  #tifton-tracker .stat.blocker-stat {
+    cursor: pointer;
+    background: var(--rust-bg);
+    border-left: 2px solid var(--rust);
+  }
+  #tifton-tracker .stat.blocker-stat .n { color: var(--rust); }
+  #tifton-tracker .stat.blocker-stat .l { color: var(--rust); font-weight: 600; }
+  #tifton-tracker .stat.blocker-stat:hover { background: #f4d9d3; }
+  #tifton-tracker .stat.blocker-stat.active { background: var(--rust); }
+  #tifton-tracker .stat.blocker-stat.active .n,
+  #tifton-tracker .stat.blocker-stat.active .l { color: white; }
+
+  #tifton-tracker .toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px 24px;
+    border-bottom: 1px solid rgba(255,255,255,0.25);
+    background: rgba(255,255,255,0.12);
+  }
+  #tifton-tracker .toolbar-filters {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: space-between;
+  }
+  #tifton-tracker .toolbar-filters > * { flex: 1 1 0; min-width: 0; }
+  #tifton-tracker .toolbar-search {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  #tifton-tracker .active-filters {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+  #tifton-tracker .filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--steel);
+    background: var(--steel-bg);
+    border-radius: 999px;
+    padding: 4px 6px 4px 10px;
+    white-space: nowrap;
+  }
+  #tifton-tracker .filter-chip.late-chip { color: var(--amber); background: var(--amber-bg); }
+  #tifton-tracker .filter-chip-x {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+    padding: 0;
+  }
+  #tifton-tracker .filter-chip-x:hover { background: rgba(0,0,0,0.12); }
+  #tifton-tracker select, #tifton-tracker input[type=text] {
+    font-family: inherit;
+    font-size: 13px;
+    padding: 7px 10px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--panel);
+    color: var(--ink);
+  }
+  #tifton-tracker input[type=text] { width: 100%; max-width: 340px; }
+
+  #tifton-tracker .view-toggle {
+    display: flex;
+    border: 1px solid var(--ink);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-left: auto;
+  }
+  #tifton-tracker .view-toggle button {
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 7px 12px;
+    border: none;
+    border-right: 1px solid #d5d5d5;
+    background: var(--panel);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  #tifton-tracker .view-toggle button:last-child { border-right: none; }
+  #tifton-tracker .view-toggle button.active { background: var(--ink); color: var(--paper); border-right-color: var(--ink); }
+  #tifton-tracker .btn-copy {
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 14px;
+    border: 1px solid var(--ink);
+    border-radius: 6px;
+    background: var(--panel);
+    color: var(--ink);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  #tifton-tracker .btn-copy:hover { background: var(--ink); color: var(--paper); }
+  #tifton-tracker .btn-copy.copied { background: var(--moss); border-color: var(--moss); color: white; }
+
+  #tifton-tracker .data-io {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    padding: 14px 24px 20px;
+    border-top: 1px solid rgba(243,241,234,0.25);
+  }
+  #tifton-tracker .btn-io {
+    display: inline-block;
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 7px 14px;
+    border: 1px solid rgba(243,241,234,0.5);
+    border-radius: 6px;
+    background: transparent;
+    color: rgba(243,241,234,0.85);
+    cursor: pointer;
+  }
+  #tifton-tracker .btn-io:hover { background: rgba(243,241,234,0.12); border-color: rgba(243,241,234,0.8); color: #f3f1ea; }
+  #tifton-tracker .logout-row { text-align: center; padding: 0 24px 16px; }
+  #tifton-tracker .logout-link { font-size: 11.5px; color: rgba(243,241,234,0.55); text-decoration: none; }
+  #tifton-tracker .logout-link:hover { text-decoration: underline; color: rgba(243,241,234,0.85); }
+
+  /* Network diagram */
+  #tifton-tracker .network-fab {
+    position: fixed;
+    bottom: 16px;
+    right: 20px;
+    z-index: 400;
+    background: rgba(51, 66, 73, 0.9);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.5);
+    border-radius: 20px;
+    padding: 7px 14px;
+    font-size: 12px;
+    font-family: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  #tifton-tracker .network-fab:hover { background: #334249; }
+  #tifton-tracker .diagram-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 26, 29, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 600;
+    padding: 20px;
+  }
+  #tifton-tracker .diagram-modal {
+    background: #fff;
+    border-radius: 14px;
+    padding: 20px;
+    max-width: 720px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  #tifton-tracker .diagram-modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  #tifton-tracker .diagram-modal-head h2 { font-size: 16px; font-weight: 700; margin: 0; color: var(--ink); font-family: 'Oswald', sans-serif; }
+  #tifton-tracker .diagram-close-btn {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: var(--paper);
+    color: var(--ink-soft);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 15px;
+    line-height: 1;
+  }
+  #tifton-tracker .diagram-close-btn:hover { background: var(--line); color: var(--ink); }
+  #tifton-tracker .diagram-visual {
+    background: linear-gradient(180deg, #9AC6E2 0%, #263138 100%);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  #tifton-tracker .diagram-caption { font-size: 13px; color: #fff; line-height: 1.5; margin-top: 12px; }
+  #tifton-tracker .diagram-security { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+  #tifton-tracker .diagram-security-title { font-size: 14px; font-weight: 700; color: var(--ink); margin: 0 0 8px; font-family: 'Oswald', sans-serif; }
+  #tifton-tracker .diagram-security-text { font-size: 13px; color: var(--ink-soft); line-height: 1.6; margin: 0 0 8px; }
+  #tifton-tracker .diagram-security-text:last-child { margin-bottom: 0; }
+  #tifton-tracker .visually-hidden-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  #tifton-tracker .body { padding: 18px 24px 26px; }
+
+  /* Board view */
+  #tifton-tracker .as-of-banner {
+    font-family: 'Oswald', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: var(--ink);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--steel);
+    border-radius: 6px;
+    padding: 10px 16px;
+    margin-bottom: 14px;
+  }
+  #tifton-tracker .as-of-banner-empty {
+    color: var(--ink-soft);
+    font-weight: 600;
+    border-left-color: var(--slate);
+    text-transform: none;
+    letter-spacing: normal;
+  }
+  #tifton-tracker .board {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    overflow-x: auto;
+    padding-bottom: 8px;
+  }
+  #tifton-tracker .board-col {
+    flex: 1 0 260px;
+    min-width: 260px;
+  }
+  #tifton-tracker .board-scrollbar-proxy {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 16px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    background: rgba(27,32,39,0.85);
+    z-index: 500;
+    display: none;
+  }
+  #tifton-tracker .board-scrollbar-proxy.visible { display: block; }
+  #tifton-tracker .board-scrollbar-proxy-inner { height: 1px; }
+  #tifton-tracker .col-head {
+    font-family: 'Oswald', sans-serif;
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    padding-bottom: 8px;
+    margin-bottom: 10px;
+    color: #334249;
+    border-bottom: 2px solid rgba(51,66,73,0.55);
+    display: flex;
+    justify-content: space-between;
+  }
+  #tifton-tracker .col-head span.count { color: rgba(51,66,73,0.7); font-weight: 400; }
+  #tifton-tracker .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--slate);
+    border-radius: 6px;
+    padding: 11px 12px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+  }
+  #tifton-tracker .card:hover { border-color: var(--ink); }
+  #tifton-tracker .card.open { border-left-color: var(--rust); }
+  #tifton-tracker .card.inprogress { border-left-color: var(--amber); }
+  #tifton-tracker .card.testing { border-left-color: var(--steel); }
+  #tifton-tracker .card.readycustomer { border-left-color: var(--moss); }
+  #tifton-tracker .card.readyinstall { border-left-color: var(--slate); }
+  #tifton-tracker .card.monitoring { border-left-color: var(--plum); }
+  #tifton-tracker .card.onhold { border-left-color: var(--forest); }
+  #tifton-tracker .card.closed { border-left-color: var(--teal); }
+  #tifton-tracker .card-top { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+  #tifton-tracker .tag {
+    font-size: 10.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--steel-dark);
+    background: #e4ebef;
+    padding: 2px 7px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  #tifton-tracker .card-title { font-size: 13.5px; font-weight: 600; line-height: 1.3; margin-bottom: 3px; min-height: calc(1.3em * 2); }
+  #tifton-tracker .blocker-tag {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: white;
+    background: var(--rust);
+    padding: 2px 7px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  #tifton-tracker .card-tag-slot { display: flex; }
+  #tifton-tracker .late-tag {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: white;
+    background: var(--amber);
+    padding: 2px 7px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  #tifton-tracker .card.is-late { border-left-color: var(--amber); box-shadow: inset 0 0 0 1px var(--amber-bg); }
+  #tifton-tracker .meta-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+  #tifton-tracker .devops-tag {
+    display: inline-block;
+    font-family: monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--steel-dark);
+    background: #e4ebef;
+    border: 1px solid #c9d7de;
+    border-radius: 4px;
+    padding: 1px 7px;
+  }
+  #tifton-tracker .priority-tag {
+    display: inline-block;
+    font-size: 10.5px;
+    font-weight: 600;
+    border-radius: 4px;
+    padding: 1px 7px;
+    background: var(--steel-bg);
+    color: var(--steel);
+  }
+  #tifton-tracker .priority-tag.high { background: var(--rust-bg); color: var(--rust); }
+  #tifton-tracker .priority-tag.medium { background: var(--amber-bg); color: var(--amber); }
+  #tifton-tracker .priority-tag.low { background: var(--slate-bg); color: var(--slate); }
+  #tifton-tracker .target-tag {
+    display: inline-block;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--steel-dark);
+    background: #e4ebef;
+    border-radius: 4px;
+    padding: 1px 7px;
+  }
+  #tifton-tracker .target-tag.target-tag-late {
+    color: var(--rust);
+    background: var(--rust-bg);
+    font-weight: 700;
+  }
+  #tifton-tracker .card-detail {
+    font-size: 12px;
+    color: var(--ink-soft);
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    min-height: calc(1.4em * 3);
+  }
+  #tifton-tracker .card-reported { font-size: 10.5px; color: var(--ink-soft); margin-top: 2px; }
+  #tifton-tracker .card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 8px;
+    margin-top: auto;
+    padding-top: 8px;
+  }
+
+  /* Table view */
+  #tifton-tracker table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  #tifton-tracker thead th {
+    text-align: left;
+    font-family: 'Oswald', sans-serif;
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #f3f1ea;
+    padding: 8px 10px;
+    border-bottom: 2px solid rgba(243,241,234,0.55);
+  }
+  #tifton-tracker tbody tr { background: rgba(255,255,255,0.9); }
+  #tifton-tracker tbody td { padding: 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  #tifton-tracker tbody tr:hover { background: #ffffff; cursor: pointer; }
+  #tifton-tracker .status-pill {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 100px;
+    white-space: nowrap;
+    display: inline-block;
+  }
+  #tifton-tracker .status-pill.open { background: var(--rust-bg); color: var(--rust); }
+  #tifton-tracker .status-pill.inprogress { background: var(--amber-bg); color: var(--amber); }
+  #tifton-tracker .status-pill.testing { background: var(--steel-bg); color: var(--steel); }
+  #tifton-tracker .status-pill.readycustomer { background: var(--moss-bg); color: var(--moss); }
+  #tifton-tracker .status-pill.readyinstall { background: var(--slate-bg); color: var(--slate); }
+  #tifton-tracker .status-pill.monitoring { background: var(--plum-bg); color: var(--plum); }
+  #tifton-tracker .status-pill.onhold { background: var(--forest-bg); color: var(--forest); }
+  #tifton-tracker .status-pill.closed { background: var(--teal-bg); color: var(--teal); }
+
+  #tifton-tracker .empty { text-align: center; padding: 40px 20px; color: rgba(243,241,234,0.75); font-size: 13px; }
+
+  /* Calendar view */
+  #tifton-tracker .calendar {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  #tifton-tracker .cal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  #tifton-tracker .cal-month-label {
+    font-family: 'Oswald', sans-serif;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--ink);
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+  #tifton-tracker .cal-month-count { font-size: 12px; font-weight: 400; color: var(--ink-soft); }
+  #tifton-tracker .cal-nav {
+    font-family: inherit;
+    font-size: 18px;
+    font-weight: 600;
+    width: 30px;
+    height: 30px;
+    line-height: 1;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--paper);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  #tifton-tracker .cal-nav:hover { border-color: var(--ink); }
+  #tifton-tracker .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+  }
+  #tifton-tracker .cal-grid-head { margin-bottom: 6px; }
+  #tifton-tracker .cal-dayname {
+    text-align: center;
+    font-size: 10.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ink-soft);
+    padding-bottom: 4px;
+  }
+  #tifton-tracker .cal-cell {
+    min-height: 64px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 6px;
+    position: relative;
+  }
+  #tifton-tracker .cal-cell.empty { border-color: transparent; }
+  #tifton-tracker .cal-daynum { font-size: 12px; color: var(--ink-soft); }
+  #tifton-tracker .cal-cell.is-today .cal-daynum { color: var(--steel); font-weight: 700; }
+  #tifton-tracker .cal-cell.is-today { border-color: var(--steel); border-width: 2px; }
+  #tifton-tracker .cal-cell.has-due {
+    cursor: pointer;
+    background: var(--rust-bg);
+    border-color: var(--rust);
+  }
+  #tifton-tracker .cal-cell.has-due:hover { background: #f4d9d3; }
+  #tifton-tracker .cal-cell.has-due.is-selected { background: var(--rust); border-color: var(--rust); }
+  #tifton-tracker .cal-cell.has-due.is-selected .cal-daynum,
+  #tifton-tracker .cal-cell.has-due.is-selected .cal-count { color: white; }
+  #tifton-tracker .cal-count {
+    position: absolute;
+    bottom: 6px;
+    right: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--rust);
+  }
+  #tifton-tracker .cal-detail {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  #tifton-tracker .cal-detail-header {
+    font-family: 'Oswald', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink);
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+  }
+  #tifton-tracker .cal-detail-header .count { font-weight: 400; color: var(--ink-soft); }
+  #tifton-tracker .cal-detail-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+
+  /* Completed view */
+  #tifton-tracker .closed-wrap {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  #tifton-tracker .closed-header {
+    font-family: 'Oswald', sans-serif;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--teal);
+    border-bottom: 2px solid var(--teal);
+    padding-bottom: 8px;
+    margin-bottom: 14px;
+  }
+  #tifton-tracker .closed-header .count { font-weight: 400; color: rgba(243,241,234,0.75); }
+
+
+  /* FDD view */
+  #tifton-tracker .fdd-table thead th {
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 700;
+  }
+  #tifton-tracker .fdd-row-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+  }
+  #tifton-tracker .fdd-row-upload-input {
+    font-size: 11.5px;
+    max-width: 190px;
+  }
+  #tifton-tracker .fdd-row-file-name {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink);
+    max-width: 100px;
+    flex-shrink: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  #tifton-tracker .fdd-row-file-size {
+    font-size: 11px;
+    color: var(--ink-soft);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  #tifton-tracker .fdd-row-view-btn {
+    padding: 4px 10px;
+    font-size: 12px;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  #tifton-tracker .fdd-row-remove-btn {
+    flex-shrink: 0;
+  }
+  #tifton-tracker .fdd-detail-row td {
+    padding: 12px;
+    background: var(--paper);
+    border-bottom: 1px solid var(--line);
+  }
+  #tifton-tracker .fdd-preview-frame {
+    width: 100%;
+    height: 60vh;
+    min-height: 360px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: white;
+  }
+
+  /* History view */
+  #tifton-tracker .history-wrap {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  #tifton-tracker .history-header {
+    font-family: 'Oswald', sans-serif;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--ink);
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 8px;
+    margin-bottom: 14px;
+  }
+  #tifton-tracker .history-header .count { font-weight: 400; color: var(--ink-soft); }
+  #tifton-tracker .history-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  #tifton-tracker .history-table thead th {
+    text-align: left;
+    font-family: 'Oswald', sans-serif;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ink-soft);
+    padding: 6px 10px;
+    border-bottom: 2px solid var(--line);
+  }
+  #tifton-tracker .history-table tbody td { padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  #tifton-tracker .history-delete-btn {
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: transparent;
+    color: var(--ink-soft);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 15px;
+    line-height: 1;
+  }
+  #tifton-tracker .history-delete-btn:hover { background: var(--rust-bg); color: var(--rust); }
+  #tifton-tracker .history-hint { font-size: 12.5px; color: var(--ink-soft); margin: -6px 0 12px; }
+
+  /* Analysis view */
+  #tifton-tracker .analysis-wrap { display: flex; flex-direction: column; gap: 16px; }
+  #tifton-tracker .analysis-chart-row { display: flex; gap: 16px; flex-wrap: wrap; }
+  #tifton-tracker .analysis-chart-row .analysis-card { flex: 1 1 320px; min-width: 0; margin-bottom: 0; }
+  #tifton-tracker .analysis-header {
+    font-family: 'Oswald', sans-serif;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  #tifton-tracker .analysis-header .count { font-weight: 400; color: var(--ink-soft); }
+  #tifton-tracker .analysis-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  #tifton-tracker .analysis-card-title {
+    font-family: 'Oswald', sans-serif;
+    font-size: 14.5px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 10px;
+  }
+  #tifton-tracker .analysis-card-title .count { font-weight: 400; color: var(--ink-soft); font-size: 13px; }
+  #tifton-tracker .chart-wrap { width: 100%; }
+  #tifton-tracker .chart-legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px; }
+  #tifton-tracker .chart-legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink); }
+  #tifton-tracker .chart-legend-swatch { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  #tifton-tracker .analysis-stat-row { display: flex; gap: 20px; flex-wrap: wrap; }
+  #tifton-tracker .analysis-stat { flex: 1; min-width: 140px; }
+  #tifton-tracker .analysis-stat-n { font-family: 'Oswald', sans-serif; font-size: 26px; font-weight: 700; color: var(--steel); }
+  #tifton-tracker .analysis-stat-l { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+  #tifton-tracker .stuck-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  #tifton-tracker .stuck-table thead th {
+    text-align: left;
+    font-family: 'Oswald', sans-serif;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ink-soft);
+    padding: 6px 10px;
+    border-bottom: 2px solid var(--line);
+  }
+  #tifton-tracker .stuck-table tbody td { padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  #tifton-tracker .stuck-table tbody tr { cursor: pointer; }
+  #tifton-tracker .stuck-table tbody tr:hover { background: var(--paper); }
+  #tifton-tracker .history-row.clickable { cursor: pointer; }
+  #tifton-tracker .history-row.clickable:hover { background: var(--paper); }
+  #tifton-tracker .history-row.expanded { background: var(--paper); }
+  #tifton-tracker .history-expand-caret {
+    display: inline-block;
+    width: 12px;
+    color: var(--ink-soft);
+    transition: transform 0.15s ease;
+  }
+  #tifton-tracker .history-row.expanded .history-expand-caret { transform: rotate(90deg); }
+  #tifton-tracker .history-detail-row td { padding: 0; border-bottom: 1px solid var(--line); }
+  #tifton-tracker .history-detail-row .history-diff-section { margin: 0; border-radius: 0; border-left: none; border-right: none; border-top: none; }
+  #tifton-tracker .history-diff-section {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 16px;
+  }
+  #tifton-tracker .history-diff-title { font-family: 'Oswald', sans-serif; font-size: 13.5px; font-weight: 600; color: var(--ink); margin-bottom: 4px; }
+  #tifton-tracker .history-diff-summary { font-size: 12.5px; color: var(--ink-soft); margin-bottom: 10px; }
+  #tifton-tracker .history-diff-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+  #tifton-tracker .history-diff-list:last-child { margin-bottom: 0; }
+  #tifton-tracker .history-diff-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; flex-wrap: wrap; }
+  #tifton-tracker .history-diff-arrow { color: var(--ink-soft); }
+  #tifton-tracker .history-diff-item-title { color: var(--ink); }
+  #tifton-tracker .status-pill.unmatched { background: var(--slate-bg); color: var(--slate); }
+
+  /* Modal */
+  #tifton-tracker .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(27,32,39,0.5);
+    display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px;
+  }
+  #tifton-tracker .modal {
+    background: var(--panel); border-radius: 10px; padding: 24px;
+    max-width: 480px; width: 100%; max-height: 86vh; overflow-y: auto;
+    border: 1px solid var(--line);
+  }
+  #tifton-tracker .modal h2 { font-family: 'Oswald', sans-serif; font-size: 18px; margin: 0 0 14px; }
+  #tifton-tracker .field { margin-bottom: 12px; }
+  #tifton-tracker .field label { display: block; font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); margin-bottom: 4px; }
+  #tifton-tracker .field input, #tifton-tracker .field select, #tifton-tracker .field textarea {
+    width: 100%; font-family: inherit; font-size: 13.5px; padding: 8px 10px;
+    border: 1px solid var(--line); border-radius: 6px; background: var(--paper);
+  }
+  #tifton-tracker .field textarea { min-height: 70px; resize: vertical; }
+  #tifton-tracker .field-row { display: flex; gap: 10px; }
+  #tifton-tracker .field-row .field { flex: 1; }
+  #tifton-tracker .modal-actions { display: flex; justify-content: space-between; margin-top: 18px; gap: 8px; }
+  #tifton-tracker .btn-primary {
+    font-family: inherit; font-weight: 600; font-size: 13px; padding: 9px 16px;
+    border: none; border-radius: 6px; background: var(--steel); color: white; cursor: pointer;
+  }
+  #tifton-tracker .btn-secondary {
+    font-family: inherit; font-weight: 600; font-size: 13px; padding: 9px 16px;
+    border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); cursor: pointer;
+  }
+  #tifton-tracker .btn-delete {
+    font-family: inherit; font-weight: 600; font-size: 13px; padding: 9px 16px;
+    border: none; border-radius: 6px; background: transparent; color: var(--rust); cursor: pointer;
+  }
+  #tifton-tracker .save-note { font-size: 11px; color: rgba(243,241,234,0.7); text-align: right; padding: 0 24px 14px; }
+
+  @media (max-width: 480px) {
+    #tifton-tracker .head { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+
+<div id="tifton-tracker">
+  <div class="head">
+    <div>
+      <p class="eyebrow">HY-TEK &middot; DELTA GALIL</p>
+      <h1>TIFTON Go-Live Tracker</h1>
+      <p class="head-sub" id="header-summary">Loading&hellip;</p>
+    </div>
+    <div class="stat-row" id="stat-row"></div>
+  </div>
+
+  <div class="toolbar">
+    <div class="toolbar-filters">
+      <select id="filter-status">
+        <option value="">All statuses</option>
+      </select>
+      <select id="filter-blocker">
+        <option value="">Blocker: All</option>
+        <option value="Y">Walmart blocker only</option>
+        <option value="N">Not a blocker</option>
+      </select>
+      <select id="filter-missing">
+        <option value="">Missing info: All</option>
+        <option value="devops">Missing DevOps #</option>
+        <option value="target">Missing Due Date</option>
+        <option value="either">Missing DevOps # or Due Date</option>
+      </select>
+      <button class="btn-copy" id="btn-copy-view">Copy view</button>
+    </div>
+    <div class="toolbar-search">
+      <input type="text" id="search" placeholder="Search issues...">
+      <div class="active-filters" id="active-filters"></div>
+      <div class="view-toggle" id="view-toggle">
+        <button data-view="analysis">Analysis</button>
+        <button data-view="board" class="active">Board</button>
+        <button data-view="fdd">FDD</button>
+        <button data-view="history">History</button>
+        <button data-view="calendar">Calendar</button>
+        <button data-view="table">Table</button>
+        <button data-view="closed">Closed</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="body" id="body"></div>
+  <div class="board-scrollbar-proxy" id="board-scrollbar-proxy">
+    <div class="board-scrollbar-proxy-inner" id="board-scrollbar-proxy-inner"></div>
+  </div>
+  <div class="save-note" id="save-note">Loading&hellip;</div>
+  <div class="data-io">
+    <button class="btn-io" id="btn-upload-raid">Upload RAID Log</button>
+    <button class="btn-io" id="btn-export">Export JSON</button>
+    <button class="btn-io" id="btn-import">Import JSON</button>
+  </div>
+  <div class="logout-row"><a href="/logout" class="logout-link">Log out</a></div>
+  <button type="button" class="network-fab" id="btn-network-diagram">Network diagram</button>
+</div>
+
+<script>
+(function() {
+  const ROOT = document.getElementById('tifton-tracker');
+  const CURRENT_DATA_VERSION = 8; // bump this whenever the seed data below should replace what's saved
+
+  const SEED_ISSUES = [];
+
+  const STATUS_LABELS = { open: 'Open', inprogress: 'In Progress (Dev)', testing: 'Testing', readycustomer: 'Ready for Customer', readyinstall: 'Ready for Install', monitoring: 'Monitoring', onhold: 'On Hold', closed: 'Closed' };
+  // Full canonical list of every status the tool understands — used by
+  // filters, the Table view, and the edit modal's status dropdown.
+  const STATUS_ORDER = ['open', 'inprogress', 'testing', 'readycustomer', 'readyinstall', 'monitoring', 'onhold', 'closed'];
+  // The Board view intentionally shows only these five, in this exact
+  // order — Monitoring/On Hold/Closed items still exist and are fully
+  // trackable elsewhere (Table view, Closed tab, filters), they're just
+  // not given their own Board column.
+  const BOARD_STATUS_ORDER = ['open', 'inprogress', 'testing', 'readycustomer', 'readyinstall'];
+
+  let issues = [];
+  let currentAsOfDate = null;
+  let currentView = 'board';
+  let calendarMonth = (() => {
+    const d = new Date();
+    return { year: d.getFullYear(), month: d.getMonth() };
+  })();
+  let selectedCalendarDate = null;
+  let editingId = null;
+  // Locally-selected FDD review files, one per issue — kept in memory only
+  // (not sent to the server/D1), so previews last only for this browser
+  // tab until cleared or the page is refreshed.
+  // Per-issue FDD file cache. Metadata (filename/size/contentType/
+  // uploadedAt) mirrors what's stored server-side in D1; blobUrl/loaded
+  // are populated lazily in THIS browser tab only, either right after an
+  // upload (built straight from the File object) or the first time a
+  // stored file's "View" is clicked (fetched and decoded from the server).
+  let fddDocs = {}; // issue id -> {filename, contentType, size, uploadedAt, blobUrl?, loaded, loading?, uploading?}
+  let expandedFddId = null; // which row's preview is currently open, if any
+  const MAX_FDD_FILE_BYTES = 8 * 1024 * 1024; // ~8 MB raw file (matches the server's base64 size ceiling with room to spare)
+  let activeBoardEl = null;
+
+  async function loadIssues() {
+    try {
+      const res = await fetch('/api/issues');
+      if (!res.ok) throw new Error('Failed to load issues: ' + res.status);
+      const payload = await res.json();
+      const storedVersion = payload.dataVersion || 0;
+      currentAsOfDate = payload.asOfDate || null;
+
+      if (storedVersion < CURRENT_DATA_VERSION) {
+        // Fresh dataset supersedes whatever was previously saved.
+        issues = SEED_ISSUES.slice();
+        await saveIssues();
+        return;
+      }
+
+      issues = Array.isArray(payload.issues) ? payload.issues : [];
+      migrateRemovedStatuses();
+    } catch (e) {
+      console.error('Load error', e);
+      issues = SEED_ISSUES.slice();
+      const noteEl = document.getElementById('save-note');
+      if (noteEl) { noteEl.textContent = 'Could not reach the database — showing default data'; }
+    }
+  }
+
+  // Fixes up any saved issues still carrying a status value that no longer exists
+  // in the app (e.g. the retired "watching" status), without touching anything else.
+  function migrateRemovedStatuses() {
+    let changed = false;
+    issues.forEach(i => {
+      if (!STATUS_ORDER.includes(i.status)) {
+        i.status = 'open';
+        changed = true;
+      }
+    });
+    if (changed) saveIssues();
+  }
+
+  // asOfDate is only passed when this save represents a live RAID Log
+  // upload (see openUploadRaidModal) — omitting it on manual single-issue
+  // edits means the "RAID LOG AS OF" date on the Board only moves when you
+  // actually re-upload the source spreadsheet, not on every small tweak.
+  async function saveIssues(asOfDate) {
+    const noteEl = document.getElementById('save-note');
+    try {
+      const body = { issues, dataVersion: CURRENT_DATA_VERSION };
+      if (asOfDate) body.asOfDate = asOfDate;
+      const res = await fetch('/api/issues', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error('Save failed: ' + res.status);
+      if (asOfDate) currentAsOfDate = asOfDate;
+      if (noteEl) { noteEl.textContent = 'Saved · shared with everyone using this tracker'; }
+    } catch (e) {
+      if (noteEl) { noteEl.textContent = 'Could not save — changes may not persist'; }
+      console.error('Storage error', e);
+    }
+  }
+
+  function populateFilters() {
+    const statusSel = document.getElementById('filter-status');
+    const curStatus = statusSel.value;
+    statusSel.innerHTML = '<option value="">All statuses</option>' + STATUS_ORDER.map(s => `<option value="${s}">${STATUS_LABELS[s]}</option>`).join('');
+    statusSel.value = curStatus;
+  }
+
+  // A target date that's a real ISO date (not text like "TBD" or "On Hold"),
+  // in the past, and not yet closed — closed items don't count as "late"
+  // even if their target date has passed, since the work is done.
+  function isLate(issue) {
+    if (!issue.targetDate || !/^\d{4}-\d{2}-\d{2}$/.test(issue.targetDate)) return false;
+    if (issue.status === 'closed') return false;
+    return issue.targetDate < todayISO();
+  }
+
+  let lateFilterActive = false;
+
+  function getFiltered() {
+    const status = document.getElementById('filter-status').value;
+    const blockerFilter = document.getElementById('filter-blocker').value;
+    const missingFilter = document.getElementById('filter-missing').value;
+    const q = document.getElementById('search').value.trim().toLowerCase();
+    return issues.filter(i => {
+      if (status && i.status !== status) return false;
+      if (blockerFilter === 'Y' && !isBlocker(i.blocker)) return false;
+      if (blockerFilter === 'N' && isBlocker(i.blocker)) return false;
+      const missingDevops = !i.devops;
+      // "Missing" a due date means blank OR a non-date placeholder like
+      // "TBD"/"On Hold"/"N/A" — anything that isn't a real, usable date.
+      const missingTarget = !i.targetDate || !/^\d{4}-\d{2}-\d{2}$/.test(i.targetDate);
+      if (missingFilter === 'devops' && !missingDevops) return false;
+      if (missingFilter === 'target' && !missingTarget) return false;
+      if (missingFilter === 'either' && !(missingDevops || missingTarget)) return false;
+      if (lateFilterActive && !isLate(i)) return false;
+      if (q) {
+        const hay = (i.title + ' ' + i.detail + ' ' + (i.owner||'') + ' ' + (i.devops||'') + ' ' + (i.notes||'')).toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }
+
+  function renderStats() {
+    const counts = {};
+    STATUS_ORDER.forEach(s => { counts[s] = 0; });
+    issues.forEach(i => { counts[i.status] = (counts[i.status]||0) + 1; });
+    // Both the Late and Walmart Blocker header tiles intentionally only
+    // count items in an active Board status (Open, In Progress, Testing,
+    // Ready for Customer, Ready for Install) — a Closed/On Hold/Monitoring
+    // item doesn't need to be flagged as late or as a blocker anymore.
+    const blockerCount = issues.filter(i => isBlocker(i.blocker) && BOARD_STATUS_ORDER.includes(i.status)).length;
+    const blockerActive = document.getElementById('filter-blocker').value === 'Y';
+    const lateCount = issues.filter(i => isLate(i) && BOARD_STATUS_ORDER.includes(i.status)).length;
+    const row = document.getElementById('stat-row');
+    // Mirrors the Board view's 5 columns for a clean, consistent header —
+    // Monitoring/On Hold/Closed items are still fully counted and
+    // visible elsewhere (Table view, Closed tab), just not given their
+    // own tile here.
+    row.innerHTML = BOARD_STATUS_ORDER.map(s =>
+      `<div class="stat ${s}"><div class="n">${counts[s]}</div><div class="l">${STATUS_LABELS[s]}</div></div>`
+    ).join('')
+      + `<div class="stat late-stat${lateFilterActive ? ' active' : ''}" id="late-stat" title="Click to show only late items (target date has passed)"><div class="n">${lateCount}</div><div class="l">Late</div></div>`
+      + `<div class="stat blocker-stat${blockerActive ? ' active' : ''}" id="blocker-stat" title="Click to show only Walmart blockers"><div class="n">${blockerCount}</div><div class="l">Walmart Blockers</div></div>`;
+    document.getElementById('late-stat').addEventListener('click', () => {
+      lateFilterActive = !lateFilterActive;
+      render();
+    });
+    document.getElementById('blocker-stat').addEventListener('click', () => {
+      const sel = document.getElementById('filter-blocker');
+      sel.value = sel.value === 'Y' ? '' : 'Y';
+      render();
+    });
+  }
+
+  function renderHeaderSummary() {
+    const el = document.getElementById('header-summary');
+    const n = issues.length;
+    el.textContent = n === 0 ? 'No issues yet' : `${n} tracked issue${n === 1 ? '' : 's'}`;
+  }
+
+  function renderActiveFilters() {
+    const container = document.getElementById('active-filters');
+    const status = document.getElementById('filter-status').value;
+    const blocker = document.getElementById('filter-blocker').value;
+    const missing = document.getElementById('filter-missing').value;
+    const search = document.getElementById('search').value;
+
+    const chips = [];
+    if (status) chips.push({ key: 'status', label: STATUS_LABELS[status] || status });
+    if (blocker === 'Y') chips.push({ key: 'blocker', label: 'Walmart blocker only' });
+    if (blocker === 'N') chips.push({ key: 'blocker', label: 'Not a blocker' });
+    if (missing === 'devops') chips.push({ key: 'missing', label: 'Missing DevOps #' });
+    if (missing === 'target') chips.push({ key: 'missing', label: 'Missing Due Date' });
+    if (missing === 'either') chips.push({ key: 'missing', label: 'Missing DevOps # or Due Date' });
+    if (lateFilterActive) chips.push({ key: 'late', label: 'Late', late: true });
+    if (search.trim()) chips.push({ key: 'search', label: `Search: "${search.trim()}"` });
+
+    container.innerHTML = chips.map(c =>
+      `<span class="filter-chip${c.late ? ' late-chip' : ''}">${c.label}<button type="button" class="filter-chip-x" data-key="${c.key}" title="Remove this filter">&times;</button></span>`
+    ).join('');
+
+    container.querySelectorAll('.filter-chip-x').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const key = btn.getAttribute('data-key');
+        if (key === 'status') document.getElementById('filter-status').value = '';
+        else if (key === 'blocker') document.getElementById('filter-blocker').value = '';
+        else if (key === 'missing') document.getElementById('filter-missing').value = '';
+        else if (key === 'late') lateFilterActive = false;
+        else if (key === 'search') document.getElementById('search').value = '';
+        render();
+      });
+    });
+  }
+
+  function formatDate(iso) {
+    if (!iso) return '';
+    // Target dates pulled from the RAID log are sometimes text placeholders
+    // ("TBD", "On HOLD", "N/A", "FDD to be created") rather than real
+    // dates — only attempt to reformat things that actually look like an
+    // ISO date (YYYY-MM-DD); anything else is shown exactly as entered
+    // rather than becoming "Invalid Date".
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
+    const [y, m, d] = iso.split('-').map(Number);
+    const dt = new Date(y, m - 1, d);
+    if (isNaN(dt)) return iso;
+    return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function isBlocker(blocker) {
+    return blocker === 'Y' || blocker === 'Y/N';
+  }
+
+  function cardHtml(issue) {
+    const priorityClass = ['high','medium','low'].includes((issue.priority || '').toLowerCase()) ? issue.priority.toLowerCase() : '';
+    const priorityLabel = priorityClass ? `${issue.priority} priority` : `Priority: ${issue.priority}`;
+    const late = isLate(issue);
+    return `
+      <div class="card ${issue.status}${late ? ' is-late' : ''}" data-id="${issue.id}">
+        <div class="card-top">
+          <div class="card-tag-slot card-tag-left">${late ? `<span class="late-tag">LATE</span>` : ''}</div>
+          <div class="card-tag-slot card-tag-right">${isBlocker(issue.blocker) ? `<span class="blocker-tag">Walmart blocker${issue.blocker === 'Y/N' ? ' (Y/N)' : ''}</span>` : ''}</div>
+        </div>
+        <div class="card-title">${issue.title}</div>
+        <div class="meta-row">
+          ${issue.priority ? `<span class="priority-tag ${priorityClass}">${priorityLabel}</span>` : ''}
+          ${issue.targetDate ? `<span class="target-tag${late ? ' target-tag-late' : ''}">Target: ${formatDate(issue.targetDate)}</span>` : ''}
+        </div>
+        <div class="card-detail">${issue.detail}</div>
+        <div class="card-footer">
+          <div>
+            ${issue.reportedDate ? `<div class="card-reported">Reported ${formatDate(issue.reportedDate)}</div>` : ''}
+          </div>
+          ${issue.devops ? `<span class="devops-tag">DevOps #${issue.devops}</span>` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderBoard(list) {
+    const asOfHtml = currentAsOfDate
+      ? `<div class="as-of-banner">RAID LOG AS OF ${formatDate(currentAsOfDate).toUpperCase()}</div>`
+      : `<div class="as-of-banner as-of-banner-empty">No RAID log uploaded yet — use "Upload RAID Log" to get started</div>`;
+    const cols = BOARD_STATUS_ORDER.map(st => {
+      const items = list.filter(i => i.status === st);
+      return `
+        <div class="board-col">
+          <div class="col-head">${STATUS_LABELS[st]} <span class="count">${items.length}</span></div>
+          ${items.map(cardHtml).join('') || '<div class="empty">No issues</div>'}
+        </div>
+      `;
+    }).join('');
+    return `${asOfHtml}<div class="board">${cols}</div>`;
+  }
+
+  function renderTable(list) {
+    const sorted = list.slice().sort((a,b) => {
+      const statusDiff = STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status);
+      return statusDiff !== 0 ? statusDiff : a.title.localeCompare(b.title);
+    });
+    if (!sorted.length) return '<div class="empty">No issues match these filters</div>';
+    return `
+      <table>
+        <thead><tr><th>Issue</th><th>DevOps #</th><th>Priority</th><th>Walmart Blocker</th><th>Reported</th><th>Target</th><th>Owner</th><th>Status</th></tr></thead>
+        <tbody>
+          ${sorted.map(i => `
+            <tr data-id="${i.id}">
+              <td>
+                <strong>${i.title}</strong><br><span style="color:var(--ink-soft);font-size:12px;">${i.detail}</span>
+                ${i.notes ? `<br><span style="color:var(--steel-dark);font-size:11.5px;font-style:italic;"><strong>Notes:</strong> ${i.notes}</span>` : ''}
+              </td>
+              <td>${i.devops || '—'}</td>
+              <td>${i.priority || '—'}</td>
+              <td>${isBlocker(i.blocker) ? `<span class="blocker-tag">${i.blocker}</span>` : (i.blocker || '—')}</td>
+              <td>${i.reportedDate ? formatDate(i.reportedDate) : '—'}</td>
+              <td>${i.targetDate ? formatDate(i.targetDate) : '—'}</td>
+              <td>${i.owner || '—'}</td>
+              <td>
+                <span class="status-pill ${i.status}">${STATUS_LABELS[i.status]}</span>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  }
+
+  function issuesByDueDate(list) {
+    const map = {};
+    list.forEach(i => {
+      if (i.targetDate) (map[i.targetDate] = map[i.targetDate] || []).push(i);
+    });
+    return map;
+  }
+
+  function renderCalendar(list) {
+    const dueMap = issuesByDueDate(list);
+    const { year, month } = calendarMonth;
+    const firstOfMonth = new Date(year, month, 1);
+    const startWeekday = firstOfMonth.getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const monthLabel = firstOfMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    const today = todayISO();
+    const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+    let cells = '';
+    for (let i = 0; i < startWeekday; i++) cells += `<div class="cal-cell empty"></div>`;
+    for (let d = 1; d <= daysInMonth; d++) {
+      const iso = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const dueIssues = dueMap[iso] || [];
+      const classes = ['cal-cell'];
+      if (dueIssues.length) classes.push('has-due');
+      if (iso === today) classes.push('is-today');
+      if (iso === selectedCalendarDate) classes.push('is-selected');
+      cells += `
+        <div class="${classes.join(' ')}" data-cal-date="${iso}">
+          <div class="cal-daynum">${d}</div>
+          ${dueIssues.length ? `<div class="cal-count">${dueIssues.length}</div>` : ''}
+        </div>`;
+    }
+    const totalCells = startWeekday + daysInMonth;
+    const trailing = (7 - (totalCells % 7)) % 7;
+    for (let i = 0; i < trailing; i++) cells += `<div class="cal-cell empty"></div>`;
+
+    const monthTotal = Object.keys(dueMap).filter(iso => iso.startsWith(`${year}-${String(month + 1).padStart(2,'0')}`)).reduce((sum, iso) => sum + dueMap[iso].length, 0);
+
+    const detailIssues = selectedCalendarDate ? (dueMap[selectedCalendarDate] || []) : [];
+    const detailHtml = selectedCalendarDate ? `
+      <div class="cal-detail">
+        <div class="cal-detail-header">Due ${formatDate(selectedCalendarDate)} <span class="count">(${detailIssues.length})</span></div>
+        <div class="cal-detail-list">
+          ${detailIssues.length ? detailIssues.map(cardHtml).join('') : '<div class="empty">No issues due this day.</div>'}
+        </div>
+      </div>` : `
+      <div class="cal-detail">
+        <div class="empty">Click a highlighted date to see what's due that day.</div>
+      </div>`;
+
+    return `
+      <div class="calendar">
+        <div class="cal-header">
+          <button type="button" class="cal-nav" id="cal-prev" aria-label="Previous month">&lsaquo;</button>
+          <div class="cal-month-label">${monthLabel}<span class="cal-month-count">${monthTotal} due this month</span></div>
+          <button type="button" class="cal-nav" id="cal-next" aria-label="Next month">&rsaquo;</button>
+        </div>
+        <div class="cal-grid cal-grid-head">${dayNames.map(n => `<div class="cal-dayname">${n}</div>`).join('')}</div>
+        <div class="cal-grid">${cells}</div>
+      </div>
+      ${detailHtml}
+    `;
+  }
+
+  function renderClosedList(list) {
+    const closed = list.filter(i => i.status === 'closed').sort((a,b) => a.title.localeCompare(b.title));
+    if (!closed.length) return '<div class="empty">No closed issues match these filters.</div>';
+    return `
+      <div class="closed-wrap">
+        <div class="closed-header">Closed <span class="count">(${closed.length})</span></div>
+        <table>
+          <thead><tr><th>Issue</th><th>DevOps #</th><th>Priority</th><th>Walmart Blocker</th><th>Reported</th><th>Target</th><th>Owner</th><th>Status</th></tr></thead>
+          <tbody>
+            ${closed.map(i => `
+              <tr data-id="${i.id}">
+                <td>
+                  <strong>${i.title}</strong><br><span style="color:var(--ink-soft);font-size:12px;">${i.detail}</span>
+                  ${i.notes ? `<br><span style="color:var(--steel-dark);font-size:11.5px;font-style:italic;"><strong>Notes:</strong> ${i.notes}</span>` : ''}
+                </td>
+                <td>${i.devops || '—'}</td>
+                <td>${i.priority || '—'}</td>
+                <td>${isBlocker(i.blocker) ? `<span class="blocker-tag">${i.blocker}</span>` : (i.blocker || '—')}</td>
+                <td>${i.reportedDate ? formatDate(i.reportedDate) : '—'}</td>
+                <td>${i.targetDate ? formatDate(i.targetDate) : '—'}</td>
+                <td>${i.owner || '—'}</td>
+                <td><span class="status-pill ${i.status}">${STATUS_LABELS[i.status]}</span></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  // ---------- FDD (Functional Design Document) tracker ----------
+  //
+  // An item is "FDD-related" if the word "FDD" shows up anywhere relevant
+  // to it — the title, the target date field (which sometimes holds a
+  // placeholder like "FDD to be created" instead of a real date), or the
+  // detail/notes text. That single check also naturally covers an FDD ID
+  // like "FDD 17676" appearing anywhere in that text.
+  function fddSearchText(issue) {
+    return [issue.title, issue.detail, issue.notes, issue.targetDate].filter(Boolean).join(' ');
+  }
+
+  function isFddItem(issue) {
+    return /FDD/i.test(fddSearchText(issue));
+  }
+
+  // Pulls the first FDD number found (e.g. "FDD 17676", "FDD#17676",
+  // "FDD-17676") out of the item's text. Returns null if none is found,
+  // so the caller can show "FDD# REQUIRED" instead.
+  function extractFddNumber(issue) {
+    const m = fddSearchText(issue).match(/FDD\s*#?\s*-?\s*(\d{3,6})/i);
+    return m ? m[1] : null;
+  }
+
+  function formatFileSize(bytes) {
+    if (bytes == null) return '';
+    return bytes > 1024 * 1024 ? (bytes / (1024 * 1024)).toFixed(1) + ' MB' : Math.max(1, Math.round(bytes / 1024)) + ' KB';
+  }
+
+  // Reads a File as base64 (stripping the "data:<mime>;base64," prefix
+  // that FileReader's readAsDataURL includes) so it can be sent as plain
+  // JSON text to /api/fdd/<issueId>.
+  function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result || '';
+        const idx = result.indexOf(',');
+        resolve(idx !== -1 ? result.slice(idx + 1) : result);
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // Reverses that — turns base64 text fetched back from the server into a
+  // blob URL the <iframe>/download link can actually use.
+  function base64ToBlobUrl(base64, contentType) {
+    const byteChars = atob(base64);
+    const byteNumbers = new Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+    const blob = new Blob([new Uint8Array(byteNumbers)], { type: contentType || 'application/octet-stream' });
+    return URL.createObjectURL(blob);
+  }
+
+  function renderFddItemsList(fddItems) {
+    if (!fddItems.length) {
+      return '<div class="empty">No FDD-related items match the current filters. An item is picked up here when "FDD" appears in its title, target date, or notes/description — including an FDD ID like "FDD 17676".</div>';
+    }
+    const sorted = fddItems.slice().sort((a, b) => {
+      const statusDiff = STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status);
+      return statusDiff !== 0 ? statusDiff : a.title.localeCompare(b.title);
+    });
+    return `
+      <table class="fdd-table">
+        <thead><tr><th>Issue</th><th>FDD #</th><th>Status</th><th>Target</th><th>FDD Document</th></tr></thead>
+        <tbody>
+          ${sorted.map(i => {
+            const fddNum = extractFddNumber(i);
+            const doc = fddDocs[i.id];
+            const isExpanded = expandedFddId === i.id && doc && doc.blobUrl;
+            return `
+              <tr data-id="${i.id}">
+                <td>
+                  <strong>${i.title}</strong><br><span style="color:var(--ink-soft);font-size:12px;">${i.detail}</span>
+                </td>
+                <td>${fddNum ? `FDD ${fddNum}` : '<span class="status-pill unmatched">FDD# REQUIRED</span>'}</td>
+                <td><span class="status-pill ${i.status}">${STATUS_LABELS[i.status]}</span></td>
+                <td>${i.targetDate ? formatDate(i.targetDate) : '—'}</td>
+                <td>${renderFddRowUploadCell(i)}</td>
+              </tr>
+              ${isExpanded ? `<tr class="fdd-detail-row"><td colspan="5">${renderFddPreview(doc)}</td></tr>` : ''}
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    `;
+  }
+
+  // Per-item upload control — each FDD-related line item gets its own file
+  // slot, since a given RAID/FDD item is reviewed against its own specific
+  // document, not a single document for the whole tracker.
+  function renderFddRowUploadCell(issue) {
+    const doc = fddDocs[issue.id];
+    if (!doc) {
+      return `
+        <div class="fdd-row-controls">
+          <input type="file" class="fdd-row-upload-input" data-fdd-issue-id="${issue.id}" accept=".pdf,.doc,.docx">
+        </div>
+      `;
+    }
+    if (doc.uploading) {
+      return `<div class="fdd-row-controls"><span class="fdd-row-file-size">Uploading&hellip;</span></div>`;
+    }
+    const viewing = expandedFddId === issue.id;
+    const viewLabel = doc.loading ? 'Loading&hellip;' : (viewing ? 'Hide' : 'View');
+    return `
+      <div class="fdd-row-controls fdd-row-file">
+        <span class="fdd-row-file-name" title="${doc.filename}">${doc.filename}</span>
+        <span class="fdd-row-file-size">(${formatFileSize(doc.size)})</span>
+        <button type="button" class="btn-secondary fdd-row-view-btn" data-fdd-view-id="${issue.id}"${doc.loading ? ' disabled' : ''}>${viewLabel}</button>
+        <button type="button" class="history-delete-btn fdd-row-remove-btn" data-fdd-remove-id="${issue.id}" title="Remove this file">&times;</button>
+      </div>
+    `;
+  }
+
+  function renderFddPreview(doc) {
+    const canPreviewInline = doc.contentType === 'application/pdf';
+    return canPreviewInline
+      ? `<iframe src="${doc.blobUrl}" class="fdd-preview-frame" title="FDD preview"></iframe>`
+      : `<div class="empty">Preview isn't available for this file type in-browser. <a href="${doc.blobUrl}" download="${doc.filename}">Download ${doc.filename}</a> to view it.</div>`;
+  }
+
+  // Redraws just the FDD tab's body content and (re)wires its controls —
+  // called both after the initial server load and after any local action
+  // (upload/view/remove), without needing to hit the network again except
+  // where the action itself requires it (see the handlers below).
+  function renderFddBody(list) {
+    const body = document.getElementById('body');
+    const fddItems = list.filter(i => isFddItem(i) && i.status !== 'closed');
+    body.innerHTML = `
+      <div class="history-wrap">
+        <div class="history-header">FDD Tracker <span class="count">(${fddItems.length} item${fddItems.length === 1 ? '' : 's'})</span></div>
+        <p class="history-hint">Items are matched automatically when "FDD" appears in the title, target date, or notes/description — including an FDD ID like "FDD 17676" (Closed items are left off this list). Upload each item's FDD document in its own row — files are saved to the shared tracker (up to ~8 MB each) so everyone sees the same document.</p>
+        ${renderFddItemsList(fddItems)}
+      </div>
+    `;
+
+    body.querySelectorAll('[data-id]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        if (e.target.closest('.fdd-row-controls')) return;
+        openModal(el.getAttribute('data-id'));
+      });
+    });
+
+    body.querySelectorAll('.fdd-row-upload-input').forEach(input => {
+      input.addEventListener('click', (e) => e.stopPropagation());
+      input.addEventListener('change', async () => {
+        const file = input.files[0];
+        if (!file) return;
+        const issueId = input.getAttribute('data-fdd-issue-id');
+        if (file.size > MAX_FDD_FILE_BYTES) {
+          showAlertModal(`That file is too large to store (limit is roughly ${Math.round(MAX_FDD_FILE_BYTES / (1024 * 1024))} MB). Try a smaller file.`);
+          input.value = '';
+          return;
+        }
+        fddDocs[issueId] = { uploading: true };
+        renderFddBody(getFiltered());
+        try {
+          const base64 = await readFileAsBase64(file);
+          const res = await fetch('/api/fdd/' + encodeURIComponent(issueId), {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename: file.name, contentType: file.type, size: file.size, data: base64 }),
+          });
+          if (!res.ok) throw new Error('Upload failed: ' + res.status);
+          const payload = await res.json();
+          fddDocs[issueId] = {
+            filename: file.name,
+            contentType: file.type,
+            size: file.size,
+            uploadedAt: payload.uploadedAt || new Date().toISOString(),
+            blobUrl: URL.createObjectURL(file),
+            loaded: true,
+          };
+          expandedFddId = issueId;
+        } catch (e) {
+          console.error('FDD upload failed', e);
+          delete fddDocs[issueId];
+          showAlertModal('Could not upload that file — please try again.');
+        }
+        renderFddBody(getFiltered());
+      });
+    });
+
+    body.querySelectorAll('.fdd-row-view-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const issueId = btn.getAttribute('data-fdd-view-id');
+        if (expandedFddId === issueId) {
+          expandedFddId = null;
+          renderFddBody(getFiltered());
+          return;
+        }
+        const doc = fddDocs[issueId];
+        if (doc && !doc.loaded && !doc.loading) {
+          doc.loading = true;
+          renderFddBody(getFiltered());
+          try {
+            const res = await fetch('/api/fdd/' + encodeURIComponent(issueId));
+            if (!res.ok) throw new Error('Failed to load: ' + res.status);
+            const payload = await res.json();
+            doc.blobUrl = base64ToBlobUrl(payload.data, payload.contentType);
+            doc.loaded = true;
+          } catch (err) {
+            console.error('FDD load failed', err);
+            doc.loading = false;
+            renderFddBody(getFiltered());
+            showAlertModal('Could not load that FDD file — please try again.');
+            return;
+          }
+          doc.loading = false;
+        }
+        expandedFddId = issueId;
+        renderFddBody(getFiltered());
+      });
+    });
+
+    body.querySelectorAll('.fdd-row-remove-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const issueId = btn.getAttribute('data-fdd-remove-id');
+        showConfirmModal(
+          'Remove this FDD file? This deletes it from the shared tracker for everyone.',
+          async () => {
+            try {
+              await fetch('/api/fdd/' + encodeURIComponent(issueId), { method: 'DELETE' });
+            } catch (err) {
+              console.error('FDD delete failed', err);
+            }
+            const existing = fddDocs[issueId];
+            if (existing && existing.blobUrl) URL.revokeObjectURL(existing.blobUrl);
+            delete fddDocs[issueId];
+            if (expandedFddId === issueId) expandedFddId = null;
+            renderFddBody(getFiltered());
+          },
+          'Remove'
+        );
+      });
+    });
+  }
+
+  // Entry point for the FDD tab — fetches the current file metadata from
+  // the server (so a page refresh, or another person's upload, shows up
+  // correctly) and merges it into the local cache without clobbering a
+  // blobUrl already fetched/created earlier in this same session.
+  async function loadAndRenderFddView(list) {
+    let files;
+    try {
+      const res = await fetch('/api/fdd');
+      if (!res.ok) throw new Error('Failed to load: ' + res.status);
+      const payload = await res.json();
+      files = payload.files || [];
+    } catch (e) {
+      if (currentView === 'fdd') {
+        document.getElementById('body').innerHTML = '<div class="empty">Could not load FDD documents.</div>';
+      }
+      return;
+    }
+    if (currentView !== 'fdd') return;
+
+    const serverIds = new Set(files.map(f => f.issueId));
+    files.forEach(f => {
+      const existing = fddDocs[f.issueId];
+      fddDocs[f.issueId] = {
+        filename: f.filename,
+        contentType: f.contentType,
+        size: f.size,
+        uploadedAt: f.uploadedAt,
+        loaded: existing ? existing.loaded : false,
+        blobUrl: existing ? existing.blobUrl : undefined,
+      };
+    });
+    // Drop cached entries for files removed server-side (e.g. by someone
+    // else, or in another tab).
+    Object.keys(fddDocs).forEach(id => {
+      if (!serverIds.has(id)) {
+        if (fddDocs[id] && fddDocs[id].blobUrl) URL.revokeObjectURL(fddDocs[id].blobUrl);
+        delete fddDocs[id];
+      }
+    });
+
+    renderFddBody(list);
+  }
+
+  // ---------- History (upload snapshots) ----------
+
+  // An issue's id is 'devops-<number>' when it has a DevOps #, or
+  // 'nodevops-...' when it doesn't (see transformRaidRow). Only
+  // 'devops-' ids are meaningful to match across uploads — RAID # is just
+  // a spreadsheet row position and was dropped as the join key because it
+  // isn't stable across uploads (rows get added/removed/resorted), and a
+  // 'nodevops-' id is deliberately unique per upload (never matches
+  // anything, past or future), so those items must never be silently
+  // counted as "new" or "removed" — they're surfaced separately instead.
+  function isTrackableId(id) {
+    return typeof id === 'string' && id.indexOf('devops-') === 0;
+  }
+
+  function diffSnapshotItems(older, newer) {
+    const olderTrackable = older.filter(i => isTrackableId(i.id));
+    const newerTrackable = newer.filter(i => isTrackableId(i.id));
+    const olderMap = new Map(olderTrackable.map(i => [i.id, i]));
+    const newerMap = new Map(newerTrackable.map(i => [i.id, i]));
+    const added = [];
+    const removed = [];
+    const statusChanged = [];
+    newerMap.forEach((item, id) => {
+      if (!olderMap.has(id)) {
+        added.push(item);
+      } else if (olderMap.get(id).status !== item.status) {
+        statusChanged.push({ item, from: olderMap.get(id).status, to: item.status });
+      }
+    });
+    olderMap.forEach((item, id) => {
+      if (!newerMap.has(id)) removed.push(item);
+    });
+    // Items with no DevOps # in the NEWER upload can't be matched against
+    // anything (they've got a one-time-use id), so they're neither "added"
+    // nor "removed" — just flagged so they don't get miscounted either way.
+    // Only flagged when the item is in one of the active Board statuses
+    // (Open, In Progress, Testing, Ready for Customer, Ready for Install) —
+    // Monitoring/On Hold/Closed items aren't worth calling out here.
+    const unmatched = newer.filter(i => !isTrackableId(i.id) && BOARD_STATUS_ORDER.includes(i.status));
+    return { added, removed, statusChanged, unmatched };
+  }
+
+  async function loadAndRenderHistory() {
+    const body = document.getElementById('body');
+    let snapshots;
+    try {
+      const res = await fetch('/api/snapshots');
+      if (!res.ok) throw new Error('Failed to load history: ' + res.status);
+      const payload = await res.json();
+      snapshots = payload.snapshots || [];
+    } catch (e) {
+      if (currentView === 'history') {
+        body.innerHTML = '<div class="empty">Could not load upload history.</div>';
+      }
+      return;
+    }
+
+    if (currentView !== 'history') return; // view changed while loading
+
+    if (!snapshots.length) {
+      body.innerHTML = `
+        <div class="history-wrap">
+          <div class="history-header">Upload History</div>
+          <div class="empty">No RAID log uploads recorded yet. Use "Upload RAID Log" to start building history.</div>
+        </div>
+      `;
+      return;
+    }
+
+    body.innerHTML = `
+      <div class="history-wrap">
+        <div class="history-header">Upload History <span class="count">(${snapshots.length} upload${snapshots.length === 1 ? '' : 's'})</span></div>
+        <div class="empty">Loading item-level comparisons&hellip;</div>
+      </div>
+    `;
+
+    // Fetch full item-level detail for every upload so we can compute a
+    // New Items count and a full diff for every consecutive pair, not
+    // just the two most recent — a click on any row (other than the very
+    // first/oldest) expands to show exactly what changed since the
+    // upload right before it.
+    let details;
+    try {
+      details = await Promise.all(snapshots.map(s => fetch('/api/snapshots/' + s.id).then(r => r.json())));
+    } catch (e) {
+      details = null;
+    }
+    if (currentView !== 'history') return;
+
+    const detailById = {};
+    if (details) details.forEach(d => { if (d && d.id) detailById[d.id] = d; });
+
+    // snapshots is newest-first; pair each row with the one right after it
+    // in the array (i.e. chronologically just before it) to diff against.
+    const diffs = {}; // snapshot id -> diff vs the previous upload
+    for (let i = 0; i < snapshots.length - 1; i++) {
+      const newer = detailById[snapshots[i].id];
+      const older = detailById[snapshots[i + 1].id];
+      if (newer && older) diffs[snapshots[i].id] = diffSnapshotItems(older.issues, newer.issues);
+    }
+
+    // Every snapshot (including the oldest, which has no "previous" to
+    // diff against) still gets its own no-DevOps# count, since that's a
+    // property of the upload itself, not of a comparison between two.
+    const noDevopsCounts = {};
+    snapshots.forEach(s => {
+      const d = detailById[s.id];
+      // Only Monitoring/On Hold/Closed items are excluded — nothing left worth tracking there.
+      noDevopsCounts[s.id] = d ? d.issues.filter(i => !isTrackableId(i.id) && BOARD_STATUS_ORDER.includes(i.status)).length : 0;
+    });
+
+    const tableRows = snapshots.map((s, i) => {
+      const c = s.statusCounts;
+      const diff = diffs[s.id];
+      const isOldest = i === snapshots.length - 1;
+      const newItemsCell = isOldest ? '&mdash;' : (diff ? diff.added.length : '&hellip;');
+      const clickable = !isOldest;
+      const noDevopsCell = noDevopsCounts[s.id] || 0;
+      return `
+        <tr class="history-row${clickable ? ' clickable' : ''}" data-snapshot-id="${s.id}">
+          <td>${clickable ? '<span class="history-expand-caret">&#9656;</span>' : ''}${formatDateTime(s.uploadedAt)}</td>
+          <td>${s.itemCount}</td>
+          <td>${newItemsCell}</td>
+          <td>${noDevopsCell ? `<span class="status-pill unmatched" title="Items in this upload with no DevOps # — can't be tracked across uploads">${noDevopsCell}</span>` : '&mdash;'}</td>
+          <td>${c.open || 0}</td>
+          <td>${c.inprogress || 0}</td>
+          <td>${c.testing || 0}</td>
+          <td>${c.monitoring || 0}</td>
+          <td>${c.onhold || 0}</td>
+          <td>${c.closed || 0}</td>
+          <td><button type="button" class="history-delete-btn" data-snapshot-id="${s.id}" title="Delete this upload record">&times;</button></td>
+        </tr>
+        <tr class="history-detail-row" data-detail-for="${s.id}" style="display:none;"><td colspan="11"></td></tr>
+      `;
+    }).join('');
+
+    body.innerHTML = `
+      <div class="history-wrap">
+        <div class="history-header">Upload History <span class="count">(${snapshots.length} upload${snapshots.length === 1 ? '' : 's'})</span></div>
+        <p class="history-hint">Click any upload to see exactly what changed since the one before it. "No DevOps #" items can't be matched across uploads, so they're never counted as new or removed.</p>
+        <table class="history-table">
+          <thead><tr><th>Uploaded</th><th>Items</th><th>New Items</th><th>No DevOps #</th><th>Open</th><th>In Progress</th><th>Testing</th><th>Monitoring</th><th>On Hold</th><th>Closed</th><th></th></tr></thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </div>
+    `;
+
+    body.querySelectorAll('.history-row.clickable').forEach(row => {
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('.history-delete-btn')) return;
+        const id = row.getAttribute('data-snapshot-id');
+        const detailRow = body.querySelector(`.history-detail-row[data-detail-for="${id}"]`);
+        if (!detailRow) return;
+        const isOpen = detailRow.style.display !== 'none';
+        if (isOpen) {
+          detailRow.style.display = 'none';
+          row.classList.remove('expanded');
+          return;
+        }
+        // Collapse any other open row first, so only one is expanded at a time.
+        body.querySelectorAll('.history-detail-row').forEach(dr => { dr.style.display = 'none'; });
+        body.querySelectorAll('.history-row.expanded').forEach(r => r.classList.remove('expanded'));
+
+        const idx = snapshots.findIndex(s => String(s.id) === String(id));
+        const diff = diffs[id];
+        const cell = detailRow.querySelector('td');
+        if (diff && idx !== -1 && idx < snapshots.length - 1) {
+          cell.innerHTML = renderHistoryDiff(diff, snapshots[idx + 1].uploadedAt, snapshots[idx].uploadedAt);
+        } else {
+          cell.innerHTML = '<div class="history-diff-section"><div class="history-diff-summary">Comparison unavailable.</div></div>';
+        }
+        detailRow.style.display = '';
+        row.classList.add('expanded');
+      });
+    });
+
+    body.querySelectorAll('.history-delete-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = btn.getAttribute('data-snapshot-id');
+        showConfirmModal(
+          'Delete this upload record from History? This only removes it from the History log — it does not change your current tracker data.',
+          async () => {
+            try {
+              await fetch('/api/snapshots/' + id, { method: 'DELETE' });
+            } catch (e) {
+              console.error('Delete snapshot failed', e);
+            }
+            if (currentView === 'history') loadAndRenderHistory();
+          },
+          'Delete'
+        );
+      });
+    });
+  }
+
+  function renderHistoryDiff(diff, fromDate, toDate) {
+    const { added, removed, statusChanged, unmatched } = diff;
+    if (!added.length && !removed.length && !statusChanged.length && !(unmatched && unmatched.length)) {
+      return `<div class="history-diff-section"><div class="history-diff-title">Since ${formatDateTime(fromDate)}</div><div class="history-diff-summary">No changes between these two uploads.</div></div>`;
+    }
+    const changeRows = statusChanged.map(c => `
+      <div class="history-diff-item">
+        <span class="status-pill ${c.from}">${STATUS_LABELS[c.from] || c.from}</span>
+        <span class="history-diff-arrow">&rarr;</span>
+        <span class="status-pill ${c.to}">${STATUS_LABELS[c.to] || c.to}</span>
+        <span class="history-diff-item-title">${c.item.title}</span>
+      </div>
+    `).join('');
+    const addedRows = added.map(i => `<div class="history-diff-item"><span class="status-pill ${i.status}">New</span><span class="history-diff-item-title">${i.title}</span></div>`).join('');
+    const removedRows = removed.map(i => `<div class="history-diff-item"><span class="status-pill closed">Removed</span><span class="history-diff-item-title">${i.title}</span></div>`).join('');
+    const unmatchedRows = (unmatched || []).map(i => `<div class="history-diff-item"><span class="status-pill unmatched">No DevOps #</span><span class="history-diff-item-title">${i.title}</span></div>`).join('');
+    return `
+      <div class="history-diff-section">
+        <div class="history-diff-title">Since ${formatDateTime(fromDate)}</div>
+        <div class="history-diff-summary">${added.length} new &middot; ${removed.length} removed &middot; ${statusChanged.length} changed status${unmatched && unmatched.length ? ` &middot; ${unmatched.length} unmatched (no DevOps #)` : ''}</div>
+        ${statusChanged.length ? `<div class="history-diff-list">${changeRows}</div>` : ''}
+        ${added.length ? `<div class="history-diff-list">${addedRows}</div>` : ''}
+        ${removed.length ? `<div class="history-diff-list">${removedRows}</div>` : ''}
+        ${unmatched && unmatched.length ? `<div class="history-diff-list">${unmatchedRows}</div>` : ''}
+      </div>
+    `;
+  }
+
+  function formatDateTime(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  }
+
+  function shortDateLabel(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+
+  // ---------- Analysis (trend charts, closure velocity, stuck items) ----------
+
+  // A minimal hand-rolled SVG line chart — no charting library dependency,
+  // since this needs to keep working as a single self-contained file.
+  // Assumes every series shares the same x positions (one point per
+  // upload, evenly spaced by index rather than true elapsed time — good
+  // enough for "is this trending up or down", and avoids the complexity
+  // of a real time-scaled axis for what's usually a handful of uploads).
+  function renderLineChartSVG(series, xLabels) {
+    const width = 640, height = 220;
+    const padL = 42, padR = 16, padT = 16, padB = 28;
+    const plotW = width - padL - padR;
+    const plotH = height - padT - padB;
+    const n = xLabels.length;
+
+    let yMax = 0;
+    series.forEach(s => s.points.forEach(v => { if (v > yMax) yMax = v; }));
+    const rawStep = Math.max(1, yMax * 1.15) / 4;
+    const mag = Math.pow(10, Math.floor(Math.log10(rawStep || 1)));
+    const step = Math.max(1, Math.ceil(rawStep / mag) * mag);
+    yMax = step * 4;
+
+    const xAt = (i) => n <= 1 ? padL + plotW / 2 : padL + (plotW * i) / (n - 1);
+    const yAt = (v) => padT + plotH - (plotH * v) / yMax;
+
+    let gridLines = '';
+    for (let g = 0; g <= 4; g++) {
+      const v = step * g;
+      const y = yAt(v);
+      gridLines += `<line x1="${padL}" y1="${y}" x2="${width - padR}" y2="${y}" stroke="#dcd8cc" stroke-width="1"/>`;
+      gridLines += `<text x="${padL - 8}" y="${y + 4}" font-size="11" fill="#565f6c" text-anchor="end">${Math.round(v)}</text>`;
+    }
+
+    let xTicks = '';
+    const tickEvery = n > 8 ? Math.ceil(n / 8) : 1;
+    xLabels.forEach((lbl, i) => {
+      if (i % tickEvery !== 0 && i !== n - 1) return;
+      xTicks += `<text x="${xAt(i)}" y="${height - 8}" font-size="10.5" fill="#565f6c" text-anchor="middle">${lbl}</text>`;
+    });
+
+    let lines = '';
+    let legend = '';
+    series.forEach((s) => {
+      const pts = s.points.map((v, i) => `${xAt(i)},${yAt(v)}`).join(' ');
+      lines += `<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+      s.points.forEach((v, i) => { lines += `<circle cx="${xAt(i)}" cy="${yAt(v)}" r="3" fill="${s.color}"/>`; });
+      legend += `<span class="chart-legend-item"><span class="chart-legend-swatch" style="background:${s.color};"></span>${s.name}</span>`;
+    });
+
+    return `
+      <div class="chart-wrap">
+        <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;max-width:${width}px;display:block;">
+          ${gridLines}
+          <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT + plotH}" stroke="#565f6c" stroke-width="1"/>
+          <line x1="${padL}" y1="${padT + plotH}" x2="${width - padR}" y2="${padT + plotH}" stroke="#565f6c" stroke-width="1"/>
+          ${lines}
+          ${xTicks}
+        </svg>
+        <div class="chart-legend">${legend}</div>
+      </div>
+    `;
+  }
+
+  async function loadAndRenderAnalysis() {
+    const body = document.getElementById('body');
+    let snapshots;
+    try {
+      const res = await fetch('/api/snapshots');
+      if (!res.ok) throw new Error('Failed to load: ' + res.status);
+      const payload = await res.json();
+      snapshots = payload.snapshots || [];
+    } catch (e) {
+      if (currentView === 'analysis') body.innerHTML = '<div class="empty">Could not load upload history for analysis.</div>';
+      return;
+    }
+    if (currentView !== 'analysis') return;
+
+    if (snapshots.length < 2) {
+      body.innerHTML = `
+        <div class="analysis-wrap">
+          <div class="analysis-header">Analysis</div>
+          <div class="empty">Need at least 2 uploads to show trends. Upload another RAID log to start building this out.</div>
+        </div>
+      `;
+      return;
+    }
+
+    body.innerHTML = '<div class="empty">Crunching item-level history&hellip;</div>';
+
+    let details;
+    try {
+      details = await Promise.all(snapshots.map(s => fetch('/api/snapshots/' + s.id).then(r => r.json())));
+    } catch (e) {
+      if (currentView === 'analysis') body.innerHTML = '<div class="empty">Could not load item-level history for analysis.</div>';
+      return;
+    }
+    if (currentView !== 'analysis') return;
+
+    const detailById = {};
+    details.forEach(d => { if (d && d.id) detailById[d.id] = d; });
+
+    // Chronological order (oldest first) for trend/velocity computation —
+    // the History view sorts newest-first, but trends read naturally left
+    // (past) to right (present).
+    const chrono = snapshots.slice().sort((a, b) => new Date(a.uploadedAt) - new Date(b.uploadedAt));
+    const xLabels = chrono.map(s => shortDateLabel(s.uploadedAt));
+
+    // 1. Status trend lines
+    const trendKeys = [
+      { key: 'open', label: 'Open', color: '#a3402f' },
+      { key: 'inprogress', label: 'In Progress', color: '#c4791f' },
+      { key: 'testing', label: 'Testing', color: '#3d5a73' },
+      { key: 'closed', label: 'Closed', color: '#1f7a72' },
+    ];
+    const trendSeries = trendKeys.map(tk => ({
+      name: tk.label,
+      color: tk.color,
+      points: chrono.map(s => (s.statusCounts && s.statusCounts[tk.key]) || 0),
+    }));
+
+    // 4/7. Blocker count over time — not in statusCounts, so this needs
+    // the full item list per snapshot (already fetched above).
+    const blockerPoints = chrono.map(s => {
+      const d = detailById[s.id];
+      return d ? d.issues.filter(i => isBlocker(i.blocker)).length : 0;
+    });
+
+    // 5. Closure velocity — how many items newly became Closed between
+    // each consecutive pair of uploads.
+    const closuresPerInterval = [];
+    for (let i = 1; i < chrono.length; i++) {
+      const prevDetail = detailById[chrono[i - 1].id];
+      const curDetail = detailById[chrono[i].id];
+      if (!prevDetail || !curDetail) { closuresPerInterval.push(0); continue; }
+      const diff = diffSnapshotItems(prevDetail.issues, curDetail.issues);
+      closuresPerInterval.push(diff.statusChanged.filter(c => c.to === 'closed').length);
+    }
+    const totalClosures = closuresPerInterval.reduce((a, b) => a + b, 0);
+    const avgClosures = closuresPerInterval.length ? totalClosures / closuresPerInterval.length : 0;
+    const currentOpenCount = issues.filter(i => i.status !== 'closed').length;
+    const projectedUploads = avgClosures > 0 ? Math.ceil(currentOpenCount / avgClosures) : null;
+
+    // 2. Stuck items — for each currently-open issue, walk backward
+    // through uploads (newest to oldest) and count how many consecutive
+    // uploads it's held its CURRENT status. Only surfaced once an item
+    // has persisted across at least 2 uploads, so a single upload's
+    // items don't all show up as "stuck" on day one.
+    const newestFirst = chrono.slice().reverse();
+    const stuckItems = issues
+      .filter(i => i.status !== 'closed')
+      .map(issue => {
+        let streak = 0;
+        let sinceDate = null;
+        for (const snap of newestFirst) {
+          const d = detailById[snap.id];
+          if (!d) break;
+          const match = d.issues.find(x => x.id === issue.id);
+          if (!match || match.status !== issue.status) break;
+          streak++;
+          sinceDate = snap.uploadedAt;
+        }
+        const days = sinceDate ? Math.round((Date.now() - new Date(sinceDate)) / 86400000) : null;
+        return { issue, streak, sinceDate, days };
+      })
+      .filter(s => s.streak >= 2)
+      .sort((a, b) => b.streak - a.streak);
+
+    const closureHtml = `
+      <div class="analysis-card">
+        <div class="analysis-card-title">Closure Velocity</div>
+        <div class="analysis-stat-row">
+          <div class="analysis-stat"><div class="analysis-stat-n">${avgClosures.toFixed(1)}</div><div class="analysis-stat-l">Avg. closures per upload</div></div>
+          <div class="analysis-stat"><div class="analysis-stat-n">${totalClosures}</div><div class="analysis-stat-l">Total closed across all uploads</div></div>
+          <div class="analysis-stat"><div class="analysis-stat-n">${projectedUploads !== null ? '~' + projectedUploads : '&mdash;'}</div><div class="analysis-stat-l">Projected uploads to clear ${currentOpenCount} current Open item(s)</div></div>
+        </div>
+      </div>
+    `;
+
+    const stuckHtml = stuckItems.length ? `
+      <div class="analysis-card">
+        <div class="analysis-card-title">Stuck Items <span class="count">(${stuckItems.length})</span></div>
+        <p class="history-hint">Items that have held the same status across multiple uploads &mdash; click one to open it.</p>
+        <table class="stuck-table">
+          <thead><tr><th>Issue</th><th>Status</th><th>Owner</th><th>Since</th><th>Uploads</th><th>Days</th></tr></thead>
+          <tbody>
+            ${stuckItems.map(s => `
+              <tr data-id="${s.issue.id}">
+                <td>${s.issue.title}</td>
+                <td><span class="status-pill ${s.issue.status}">${STATUS_LABELS[s.issue.status] || s.issue.status}</span></td>
+                <td>${s.issue.owner || '&mdash;'}</td>
+                <td>${formatDate(s.sinceDate ? s.sinceDate.slice(0,10) : '')}</td>
+                <td>${s.streak}</td>
+                <td>${s.days}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    ` : `
+      <div class="analysis-card">
+        <div class="analysis-card-title">Stuck Items</div>
+        <div class="empty">No items have persisted in the same status across multiple uploads yet.</div>
+      </div>
+    `;
+
+    body.innerHTML = `
+      <div class="analysis-wrap">
+        <div class="analysis-header">Analysis <span class="count">(across ${chrono.length} uploads)</span></div>
+        <div class="analysis-chart-row">
+          <div class="analysis-card">
+            <div class="analysis-card-title">Status Trends</div>
+            ${renderLineChartSVG(trendSeries, xLabels)}
+          </div>
+          <div class="analysis-card">
+            <div class="analysis-card-title">Walmart Blockers Over Time</div>
+            ${renderLineChartSVG([{ name: 'Walmart Blockers', color: '#a3402f', points: blockerPoints }], xLabels)}
+          </div>
+        </div>
+        ${closureHtml}
+        ${stuckHtml}
+      </div>
+    `;
+
+    body.querySelectorAll('.stuck-table tbody tr').forEach(tr => {
+      tr.addEventListener('click', () => openModal(tr.getAttribute('data-id')));
+    });
+  }
+
+  function render() {
+    renderStats();
+    renderHeaderSummary();
+    renderActiveFilters();
+    const list = getFiltered();
+    const body = document.getElementById('body');
+    if (currentView === 'board') body.innerHTML = renderBoard(list);
+    else if (currentView === 'table') body.innerHTML = renderTable(list);
+    else if (currentView === 'calendar') body.innerHTML = renderCalendar(list);
+    else if (currentView === 'closed') body.innerHTML = renderClosedList(list);
+    else if (currentView === 'fdd') {
+      body.innerHTML = '<div class="empty">Loading FDD documents&hellip;</div>';
+      loadAndRenderFddView(list);
+    }
+    else if (currentView === 'history') {
+      body.innerHTML = '<div class="empty">Loading history&hellip;</div>';
+      loadAndRenderHistory();
+    }
+    else if (currentView === 'analysis') {
+      body.innerHTML = '<div class="empty">Crunching upload history&hellip;</div>';
+      loadAndRenderAnalysis();
+    }
+
+    body.querySelectorAll('[data-id]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        if (e.target.closest('.fdd-row-controls')) return;
+        openModal(el.getAttribute('data-id'));
+      });
+    });
+
+    if (currentView === 'calendar') {
+      const prevBtn = document.getElementById('cal-prev');
+      const nextBtn = document.getElementById('cal-next');
+      if (prevBtn) prevBtn.addEventListener('click', () => {
+        calendarMonth.month--;
+        if (calendarMonth.month < 0) { calendarMonth.month = 11; calendarMonth.year--; }
+        render();
+      });
+      if (nextBtn) nextBtn.addEventListener('click', () => {
+        calendarMonth.month++;
+        if (calendarMonth.month > 11) { calendarMonth.month = 0; calendarMonth.year++; }
+        render();
+      });
+      body.querySelectorAll('.cal-cell.has-due').forEach(cell => {
+        cell.addEventListener('click', () => {
+          selectedCalendarDate = cell.getAttribute('data-cal-date');
+          render();
+        });
+      });
+    }
+
+    syncBoardScrollbar();
+  }
+
+  function syncBoardScrollbar() {
+    const proxy = document.getElementById('board-scrollbar-proxy');
+    const inner = document.getElementById('board-scrollbar-proxy-inner');
+    const board = currentView === 'board' ? document.querySelector('#tifton-tracker .board') : null;
+    activeBoardEl = board;
+
+    if (!board) {
+      proxy.classList.remove('visible');
+      return;
+    }
+    const overflowing = board.scrollWidth > board.clientWidth + 1;
+    if (!overflowing) {
+      proxy.classList.remove('visible');
+      return;
+    }
+    proxy.classList.add('visible');
+    inner.style.width = board.scrollWidth + 'px';
+    proxy.scrollLeft = board.scrollLeft;
+    board.addEventListener('scroll', onActiveBoardScroll);
+  }
+
+  function onActiveBoardScroll() {
+    const proxy = document.getElementById('board-scrollbar-proxy');
+    if (activeBoardEl && proxy) proxy.scrollLeft = activeBoardEl.scrollLeft;
+  }
+
+  function todayLabel() {
+    const d = new Date();
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function todayISO() {
+    const d = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }
+
+  // ---------- Export / Import ----------
+
+  function buildExportPayload() {
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      dataVersion: CURRENT_DATA_VERSION,
+      issues: issues,
+    };
+    return JSON.stringify(payload, null, 2);
+  }
+
+  function exportData() {
+    const text = buildExportPayload();
+    const stamp = new Date().toISOString().slice(0, 10);
+    const filename = `tifton-tracker-export-${stamp}.json`;
+
+    // Best-effort automatic download. Sandboxed iframes sometimes block
+    // programmatic downloads silently, so this is backed up by the modal
+    // below which always gives a guaranteed, working way to get the data.
+    let downloadAttempted = false;
+    try {
+      const blob = new Blob([text], {type: 'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      downloadAttempted = true;
+    } catch (e) {
+      downloadAttempted = false;
+    }
+
+    showExportModal(text, filename, downloadAttempted);
+  }
+
+  function showExportModal(text, filename, downloadAttempted) {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.innerHTML = `
+      <div class="modal" style="max-width:600px;">
+        <h2>Export data</h2>
+        <p style="font-size:13px;line-height:1.5;color:var(--ink-soft);margin:0 0 12px;">
+          ${downloadAttempted ? `A download (<strong>${filename}</strong>) was started automatically. ` : ''}
+          If it didn't save anywhere useful, copy the text below and save it yourself as a <strong>.json</strong> file.
+        </p>
+        <textarea id="export-textarea" readonly style="width:100%;height:260px;font-family:monospace;font-size:11.5px;padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--paper);resize:vertical;"></textarea>
+        <div class="modal-actions" style="justify-content:flex-end;gap:8px;">
+          <button class="btn-secondary" id="export-close">Close</button>
+          <button class="btn-primary" id="export-copy">Copy text</button>
+        </div>
+      </div>
+    `;
+    ROOT.appendChild(backdrop);
+    const ta = backdrop.querySelector('#export-textarea');
+    ta.value = text;
+    const close = () => backdrop.remove();
+    backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(); });
+    backdrop.querySelector('#export-close').addEventListener('click', close);
+    backdrop.querySelector('#export-copy').addEventListener('click', async (e) => {
+      const btn = e.target;
+      let ok = false;
+      try {
+        await navigator.clipboard.writeText(text);
+        ok = true;
+      } catch (err) {
+        try {
+          ta.focus();
+          ta.select();
+          ok = document.execCommand('copy');
+        } catch (err2) { ok = false; }
+      }
+      btn.textContent = ok ? 'Copied!' : 'Select text above and copy manually';
+      setTimeout(() => { btn.textContent = 'Copy text'; }, 1800);
+    });
+  }
+
+  // ---------- Custom alert/confirm (native dialogs are blocked in sandboxed iframes) ----------
+
+  function showAlertModal(message) {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.innerHTML = `
+      <div class="modal">
+        <h2>Heads up</h2>
+        <p style="font-size:13.5px;line-height:1.5;color:var(--ink-soft);margin:0 0 18px;">${message}</p>
+        <div class="modal-actions" style="justify-content:flex-end;">
+          <button class="btn-primary" id="alert-ok">OK</button>
+        </div>
+      </div>
+    `;
+    ROOT.appendChild(backdrop);
+    const close = () => backdrop.remove();
+    backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(); });
+    backdrop.querySelector('#alert-ok').addEventListener('click', close);
+  }
+
+  function openNetworkDiagramModal() {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'diagram-backdrop';
+    backdrop.innerHTML = `
+      <div class="diagram-modal">
+        <div class="diagram-modal-head">
+          <h2>How this tool is hosted and served</h2>
+          <button type="button" class="diagram-close-btn" id="diagram-close">&times;</button>
+        </div>
+        <div class="diagram-visual">
+          <svg width="100%" viewBox="0 0 680 286" role="img" aria-label="Hosting architecture diagram">
+            <title>Hosting architecture for the TIFTON Go-Live Tracker</title>
+            <desc>GitHub stores the source code and triggers a Cloudflare Worker deploy on every push. The Worker serves the site and API to the browser and reads and writes the shared issue list in a D1 database.</desc>
+            <defs>
+              <marker id="diagram-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M2 1L8 5L2 9" fill="none" stroke="#8a93a3" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </marker>
+            </defs>
+            <g>
+              <rect x="40" y="40" width="170" height="56" rx="8" fill="#f6f7f9" stroke="#d8dbe2" stroke-width="1"/>
+              <text x="125" y="58" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="600" fill="#1e2532">GitHub repo</text>
+              <text x="125" y="76" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#6b7383">Stores project code</text>
+            </g>
+            <g>
+              <rect x="270" y="40" width="210" height="56" rx="8" fill="#f6f7f9" stroke="#d8dbe2" stroke-width="1"/>
+              <text x="375" y="58" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="600" fill="#1e2532">Cloudflare Worker deploy</text>
+              <text x="375" y="76" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#6b7383">Deploys on every push</text>
+            </g>
+            <g>
+              <rect x="40" y="190" width="170" height="56" rx="8" fill="#f6f7f9" stroke="#d8dbe2" stroke-width="1"/>
+              <text x="125" y="208" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="600" fill="#1e2532">Browser</text>
+              <text x="125" y="226" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#6b7383">Loads the tracker</text>
+            </g>
+            <g>
+              <rect x="270" y="190" width="210" height="56" rx="8" fill="#e9f5ee" stroke="#c8e6d5" stroke-width="1"/>
+              <text x="375" y="208" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="600" fill="#3a6b52">Cloudflare Worker</text>
+              <text x="375" y="226" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#3a6b52">Password gate + site + API</text>
+            </g>
+            <g>
+              <rect x="505" y="190" width="125" height="56" rx="8" fill="#f2ecfb" stroke="#ddccf2" stroke-width="1"/>
+              <text x="567" y="208" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="600" fill="#6b4fa0">D1 database</text>
+              <text x="567" y="226" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#6b4fa0">Shared issue list</text>
+            </g>
+            <line x1="210" y1="68" x2="268" y2="68" stroke="#8a93a3" stroke-width="1.5" marker-end="url(#diagram-arrow)"/>
+            <line x1="375" y1="96" x2="375" y2="188" stroke="#8a93a3" stroke-width="1.5" marker-end="url(#diagram-arrow)"/>
+            <line x1="210" y1="218" x2="268" y2="218" stroke="#8a93a3" stroke-width="1.5" marker-end="url(#diagram-arrow)"/>
+            <line x1="480" y1="218" x2="503" y2="218" stroke="#8a93a3" stroke-width="1.5" marker-end="url(#diagram-arrow)"/>
+          </svg>
+          <div class="diagram-caption">A push to GitHub triggers a fresh Cloudflare Worker deploy (top row — deploy time). Your browser talks to that running Worker, which checks your password/session, serves the tracker's HTML/JS, and reads and writes the shared issue list in the D1 database (bottom row — request time).</div>
+        </div>
+        <div class="diagram-security">
+          <div class="diagram-security-title">How the password protection works</div>
+          <p class="diagram-security-text">Every request — including the API calls this tracker makes to load and save data — is checked by this Worker before anything is served. That check happens on the server, so it can't be bypassed by viewing page source the way a password built into client-side JavaScript could be.</p>
+          <p class="diagram-security-text">The password itself is stored as a Cloudflare secret and never appears anywhere in the code or this repository.</p>
+          <p class="diagram-security-text">A correct password sets a session cookie (HttpOnly, Secure, SameSite=Lax) whose value is an expiry timestamp plus an HMAC-SHA256 signature of that timestamp, generated using a separate signing secret. The Worker verifies this signature using a constant-time comparison (to avoid leaking timing information) and checks the expiry on every request, keeping you signed in for 30 days without re-entering the password.</p>
+          <p class="diagram-security-text">This is a single shared password for anyone who has it — there are no individual user accounts and no log of who signed in.</p>
+          <p class="diagram-security-text">The D1 database itself is not exposed to the internet directly — it's only reachable through the Worker's own code via a private binding, encrypted at rest by Cloudflare, and isolated to this Cloudflare account.</p>
+        </div>
+      </div>
+    `;
+    ROOT.appendChild(backdrop);
+    const close = () => backdrop.remove();
+    backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(); });
+    backdrop.querySelector('#diagram-close').addEventListener('click', close);
+  }
+
+  // ---------- Upload RAID Log (parses the source spreadsheet directly —
+  // .xlsx, .xls, or .csv — then transforms it into this tracker's issue
+  // format and records a historical snapshot of the result) ----------
+  //
+  // Columns are detected by matching HEADER TEXT, not by fixed position.
+  // This matters because different saved versions of the same RAID log
+  // have genuinely different column layouts (e.g. one export has a
+  // "DevOps" column and 22 total columns, another has no DevOps column
+  // at all and only 16) — a hardcoded position mapping silently misreads
+  // every field whenever that happens. Header-based detection adapts to
+  // whichever layout is actually in the uploaded file.
+
+  function normalizeHeader(s) {
+    return (s || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
+  }
+
+  // Fixed column positions, per your explicit specification — not detected
+  // from header text. Header-text detection was tried first but proved too
+  // fragile: the same underlying sheet has used different exact wording for
+  // the same column across versions (and sometimes reordered columns
+  // entirely), which caused silent misreads. These exact positions are the
+  // ones you confirmed to trust for every RAID Log upload going forward.
+  //   A: RAID # (kept only for display — no longer used for the stable
+  //      ID; RAID # is just a spreadsheet row position, not a durable
+  //      identifier — see transformRaidRow)
+  //   B: Dev Ops        E: Deployment Status   J: Description
+  //   K: Turnover to DG Target Date            M: Walmart Blocker
+  //   P: Priority       R: Owner
+  // Columns not listed (Type, Internal/External, Notes, Latest Comment,
+  // DG Priority) are intentionally not read.
+  const FIXED_RAID_COLUMNS = {
+    raidNumber: 0,   // A
+    devops: 1,       // B
+    status: 4,       // E
+    description: 9,  // J
+    targetDate: 10,  // K
+    blocker: 12,     // M
+    priority: 15,    // P
+    owner: 17,       // R
+  };
+
+  function detectColumnMap() {
+    // Always the same fixed positions — see FIXED_RAID_COLUMNS above.
+    return Object.assign({}, FIXED_RAID_COLUMNS);
+  }
+
+  function mapRaidStatus(raw) {
+    const s = (raw || '').toString().trim().toLowerCase();
+    // Order matters: check the more specific/distinguishing phrases
+    // before shorter substrings that could otherwise match too broadly.
+    if (s.indexOf('closed') !== -1) return 'closed';
+    if (s.indexOf('ready for customer') !== -1) return 'readycustomer';
+    if (s.indexOf('ready for install') !== -1) return 'readyinstall';
+    if (s.indexOf('in progress') !== -1) return 'inprogress';
+    // Both "Testing" and "Testing (PSO)" land in the same bucket.
+    if (s.indexOf('testing') !== -1) return 'testing';
+    if (s.indexOf('monitoring') !== -1) return 'monitoring';
+    if (s.indexOf('on hold') !== -1 || s.indexOf('onhold') !== -1) return 'onhold';
+    return 'open';
+  }
+
+  // Same lesson as mapRaidStatus: match loosely (any case, trimmed,
+  // single-letter or full-word) rather than requiring an exact "Yes"/"No"
+  // — real exported values vary (e.g. "yes", "Y", trailing spaces) and an
+  // exact match silently miscounted many genuine blockers as non-blockers.
+  function mapRaidBlocker(raw) {
+    const b = (raw || '').toString().trim().toLowerCase();
+    if (b === 'y/n' || b === 'yes/no') return 'Y/N';
+    if (b === 'yes' || b === 'y' || b === 'true' || b === '1') return 'Y';
+    if (b === 'no' || b === 'n' || b === 'false' || b === '0') return 'N';
+    return '';
+  }
+
+  // Recognizes a handful of common non-ISO date formats seen in real
+  // exports/pastes (e.g. "4-Aug" from a text-formatted Excel cell, or
+  // "08/14/26" from a plain paste) and normalizes them to ISO YYYY-MM-DD,
+  // so isLate() and the Missing Due Date filter treat them as real dates
+  // instead of lumping them in with genuine placeholders like "TBD".
+  // Returns null if the text isn't a recognized date format at all.
+  function parseFlexibleDate(raw) {
+    const s = (raw || '').toString().trim();
+    if (!s) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+    const pad = n => String(n).padStart(2, '0');
+    const normalizeYear = (yy) => {
+      if (yy.length === 4) return parseInt(yy, 10);
+      const n = parseInt(yy, 10);
+      return n < 50 ? 2000 + n : 1900 + n;
+    };
+
+    // MM/DD/YY or MM/DD/YYYY
+    let m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
+    if (m) {
+      const [, mm, dd, yy] = m;
+      return `${normalizeYear(yy)}-${pad(mm)}-${pad(dd)}`;
+    }
+
+    const months = { jan:1, feb:2, mar:3, apr:4, may:5, jun:6, jul:7, aug:8, sep:9, oct:10, nov:11, dec:12 };
+
+    // D-MMM-YY(YY) e.g. "4-Aug-26"
+    m = s.match(/^(\d{1,2})-([A-Za-z]{3,})-(\d{2}|\d{4})$/);
+    if (m && months[m[2].toLowerCase().slice(0,3)]) {
+      const month = months[m[2].toLowerCase().slice(0,3)];
+      return `${normalizeYear(m[3])}-${pad(month)}-${pad(m[1])}`;
+    }
+
+    // D-MMM with no year e.g. "4-Aug" — assume the current year, since
+    // these are near-term project dates, not historical records.
+    m = s.match(/^(\d{1,2})-([A-Za-z]{3,})$/);
+    if (m && months[m[2].toLowerCase().slice(0,3)]) {
+      const month = months[m[2].toLowerCase().slice(0,3)];
+      return `${new Date().getFullYear()}-${pad(month)}-${pad(m[1])}`;
+    }
+
+    return null;
+  }
+
+  function excelCellToDateString(val) {
+    if (val instanceof Date && !isNaN(val)) {
+      const pad = n => String(n).padStart(2, '0');
+      return `${val.getFullYear()}-${pad(val.getMonth() + 1)}-${pad(val.getDate())}`;
+    }
+    const raw = (val || '').toString().trim();
+    const parsed = parseFlexibleDate(raw);
+    return parsed || raw;
+  }
+
+  // Every row that comes through here gets a monotonically-increasing
+  // sequence number for the CURRENT upload only — used purely to make
+  // each unmatched ("nodevops-") id unique within this one upload's
+  // array of issues; it carries no meaning across uploads.
+  let _raidRowSeq = 0;
+
+  function transformRaidRow(row, index) {
+    const raidNumber = (row.raidNumber || '').toString().trim();
+    const devops = (row.devops || '').toString().trim();
+    const noteParts = [];
+    if (row.notes) noteParts.push(row.notes);
+    if (row.latestComment) noteParts.push('Latest comment: ' + row.latestComment);
+    // Stable ID is based on DevOps # — it's assigned to the actual issue,
+    // not to a spreadsheet row, so it stays put even when rows get
+    // added/removed/resorted in Excel (unlike RAID #, which is really
+    // just a row position and broke History's diffing for exactly that
+    // reason). Rows with no DevOps # yet get a one-time-use id that will
+    // never match anything in another upload — diffSnapshotItems()
+    // recognizes that prefix and reports them as "unmatched" rather than
+    // silently counting them as new or removed every time.
+    const id = devops ? ('devops-' + devops) : ('nodevops-' + (raidNumber || 'row') + '-' + (_raidRowSeq++));
+    return {
+      id: id,
+      raidNumber: raidNumber,
+      area: (row.type || 'General').toString().trim(),
+      title: (row.description || '').toString().trim() || 'Untitled item',
+      detail: (row.description || '').toString().trim(),
+      status: mapRaidStatus(row.status),
+      owner: (row.owner || '').toString().trim(),
+      devops: devops,
+      priority: (row.priority || '').toString().trim(),
+      blocker: mapRaidBlocker(row.blocker),
+      targetDate: excelCellToDateString(row.targetDate),
+      notes: noteParts.join('\n\n'),
+      reportedDate: '',
+    };
+  }
+
+  // Turns a 2D array of raw cell values (however we got it — SheetJS,
+  function isRaidHeaderCell(cell) {
+    const h = normalizeHeader(cell);
+    return h.indexOf('raid') === 0; // "RAID #", "RAID#", "RAID No.", etc.
+  }
+
+  // or a hand-parsed paste) into the intermediate row-object shape
+  // transformRaidRow() expects, skipping the header row and any blank
+  // separator rows (e.g. the "- Risks" section dividers in the source).
+  function rawRowsToRaidObjects(rows) {
+    // Find the header row: the one whose first cell starts with "RAID".
+    let headerIdx = rows.findIndex(r => isRaidHeaderCell(r[0]));
+    if (headerIdx === -1) headerIdx = 0; // fall back to assuming row 1 is the header
+
+    const cols = detectColumnMap(rows[headerIdx]);
+    const get = (r, field) => (cols[field] !== undefined ? r[cols[field]] : '');
+
+    const dataRows = rows.slice(headerIdx + 1);
+    const objects = [];
+    dataRows.forEach((r) => {
+      const raidNumber = (get(r, 'raidNumber') || '').toString().trim();
+      const description = (get(r, 'description') || '').toString().trim();
+      // Section-divider rows (marking the start of "Risks"/"Actions"/etc.
+      // groupings in the source sheet) always use a lone "-" in the RAID #
+      // column. Checking for that directly is more reliable than checking
+      // for a blank description — in some file layouts the divider's
+      // section label (e.g. "Risks") lands in the description column
+      // position, which would otherwise let it slip through as a real
+      // item with a blank status (defaulting to "Open").
+      if (raidNumber === '-') return;
+      if (!description) return; // blank/separator row
+      objects.push({
+        raidNumber,
+        devops: get(r, 'devops'),
+        internalExternal: get(r, 'internalExternal'),
+        type: get(r, 'type'),
+        status: get(r, 'status'),
+        blocker: get(r, 'blocker'),
+        description,
+        targetDate: get(r, 'targetDate'),
+        owner: get(r, 'owner'),
+        priority: get(r, 'priority'),
+        notes: get(r, 'notes'),
+        latestComment: get(r, 'latestComment'),
+      });
+    });
+    return objects;
+  }
+
+  // Parses an uploaded .xlsx/.xls/.csv file (as an ArrayBuffer) via
+  // SheetJS, picks the sheet that actually looks like the RAID log (the
+  // one containing a "RAID #"-style header — the workbook also has a
+  // summary sheet and a validation-list sheet we want to ignore), and
+  // returns the intermediate row-object array.
+  function parseSpreadsheetFile(arrayBuffer) {
+    const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: true });
+    for (const sheetName of workbook.SheetNames) {
+      const sheet = workbook.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: '' });
+      const headerIdx = rows.findIndex(r => isRaidHeaderCell(r[0]));
+      if (headerIdx !== -1) {
+        const columnMap = detectColumnMap(rows[headerIdx]);
+        return { objects: rawRowsToRaidObjects(rows), sheetName, columnMap };
+      }
+    }
+    return { objects: [], sheetName: null, columnMap: {} };
+  }
+
+  const RAID_FIELD_LABELS = {
+    raidNumber: 'RAID #', devops: 'DevOps', internalExternal: 'Internal/External', type: 'Type',
+    status: 'Status', blocker: 'Blocker', description: 'Description', targetDate: 'Target Date',
+    owner: 'Owner', priority: 'Priority', notes: 'Notes', latestComment: 'Latest Comment',
+  };
+
+  function describeColumnMap(columnMap) {
+    const found = Object.keys(RAID_FIELD_LABELS).filter(f => columnMap[f] !== undefined).map(f => RAID_FIELD_LABELS[f]);
+    const missing = Object.keys(RAID_FIELD_LABELS).filter(f => columnMap[f] === undefined).map(f => RAID_FIELD_LABELS[f]);
+    let text = 'Columns found: ' + (found.join(', ') || 'none');
+    if (missing.length) text += '. Not found: ' + missing.join(', ') + '.';
+    return text;
+  }
+
+  // Parses text pasted directly from Excel (selecting a range of cells
+  // and copying puts tab-separated values on the clipboard).
+  function parsePastedRows(text) {
+    const lines = text.split(/\r?\n/).filter(l => l.length > 0);
+    const rows = lines.map(l => l.split('\t'));
+    return rawRowsToRaidObjects(rows);
+  }
+
+  function openUploadRaidModal() {
+    let pendingObjects = null; // set once a file has been successfully parsed
+
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.innerHTML = `
+      <div class="modal" style="max-width:600px;">
+        <h2>Upload RAID Log</h2>
+        <p style="font-size:13px;line-height:1.5;color:var(--ink-soft);margin:0 0 10px;">
+          Choose the RAID log spreadsheet directly (.xlsx, .xls, or .csv) — no need to convert
+          anything first.
+        </p>
+        <div class="field">
+          <label>Snapshot date — when was this RAID log exported/current as of?</label>
+          <input type="date" id="raid-modal-date" value="${todayISO()}">
+          <p style="font-size:12px;color:var(--ink-soft);margin:6px 0 0;">
+            Today's date: replaces your current tracker data and records this upload in History.
+            A past date: adds a historical record to History only — your current tracker data
+            stays as-is.
+          </p>
+        </div>
+        <div class="field">
+          <label>Choose file</label>
+          <input type="file" id="raid-modal-file" accept=".xlsx,.xls,.csv">
+          <p id="raid-modal-file-status" style="font-size:12px;color:var(--ink-soft);margin:6px 0 0;"></p>
+        </div>
+        <div class="field">
+          <label>Or paste copied rows from Excel here (select the rows, Ctrl+C, paste below)</label>
+          <textarea id="raid-modal-textarea" placeholder="Paste copied Excel rows here..." style="width:100%;height:140px;font-family:monospace;font-size:11.5px;padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--paper);resize:vertical;"></textarea>
+        </div>
+        <p id="raid-modal-error" style="font-size:12.5px;color:var(--rust);margin:0 0 8px;display:none;"></p>
+        <div class="modal-actions" style="justify-content:flex-end;gap:8px;">
+          <button class="btn-secondary" id="raid-cancel">Cancel</button>
+          <button class="btn-primary" id="raid-load">Upload</button>
+        </div>
+      </div>
+    `;
+    ROOT.appendChild(backdrop);
+    const close = () => backdrop.remove();
+    backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(); });
+    backdrop.querySelector('#raid-cancel').addEventListener('click', close);
+
+    const fileInput = backdrop.querySelector('#raid-modal-file');
+    const textarea = backdrop.querySelector('#raid-modal-textarea');
+    const dateInput = backdrop.querySelector('#raid-modal-date');
+    const errorEl = backdrop.querySelector('#raid-modal-error');
+    const fileStatusEl = backdrop.querySelector('#raid-modal-file-status');
+
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files[0];
+      if (!file) return;
+      errorEl.style.display = 'none';
+      fileStatusEl.textContent = 'Reading file…';
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const { objects, sheetName, columnMap } = parseSpreadsheetFile(reader.result);
+          if (!objects.length) {
+            pendingObjects = null;
+            fileStatusEl.textContent = '';
+            errorEl.textContent = 'Could not find a "RAID #" column in any sheet of this file. Make sure this is the RAID log spreadsheet.';
+            errorEl.style.display = 'block';
+            return;
+          }
+          pendingObjects = objects;
+          fileStatusEl.innerHTML = `Found ${objects.length} row(s) in sheet "${sheetName}". Click Upload to continue.<br><span style="opacity:0.8;">${describeColumnMap(columnMap)}</span>`;
+        } catch (e) {
+          pendingObjects = null;
+          fileStatusEl.textContent = '';
+          errorEl.textContent = 'Could not read that file as a spreadsheet — try a .xlsx, .xls, or .csv export, or use the paste option below.';
+          errorEl.style.display = 'block';
+        }
+      };
+      reader.onerror = () => {
+        pendingObjects = null;
+        fileStatusEl.textContent = '';
+        errorEl.textContent = 'Could not read that file — try pasting rows into the box below instead.';
+        errorEl.style.display = 'block';
+      };
+      reader.readAsArrayBuffer(file);
+    });
+
+    backdrop.querySelector('#raid-load').addEventListener('click', () => {
+      let objects = pendingObjects;
+      if (!objects) {
+        const pasted = textarea.value.trim();
+        if (!pasted) {
+          errorEl.textContent = 'Choose a file above, or paste copied rows into the box before uploading.';
+          errorEl.style.display = 'block';
+          return;
+        }
+        objects = parsePastedRows(pasted);
+        if (!objects.length) {
+          errorEl.textContent = 'Could not find any RAID log rows in the pasted text.';
+          errorEl.style.display = 'block';
+          return;
+        }
+      }
+      const snapshotDate = dateInput.value || todayISO();
+      const isHistorical = snapshotDate !== todayISO();
+      _raidRowSeq = 0;
+      const transformed = objects.map((row, i) => transformRaidRow(row, i));
+      close();
+
+      const confirmMessage = isHistorical
+        ? `Record this as a historical RAID log snapshot dated ${formatDate(snapshotDate)}? This adds ${transformed.length} item(s) to History only — it will NOT change your current tracker data.`
+        : `Upload ${transformed.length} item(s) from this RAID log? This will replace all ${issues.length} item(s) currently in the tracker.`;
+
+      showConfirmModal(
+        confirmMessage,
+        async () => {
+          // Live uploads use the real current moment (full timestamp
+          // precision) so multiple uploads on the same calendar day still
+          // sort in the order they actually happened — using a fixed
+          // noon-of-that-date timestamp for every live upload would make
+          // same-day uploads indistinguishable and their History order
+          // effectively random. Historical (backdated) uploads don't have
+          // a real time to anchor to, so noon-of-that-date is the
+          // reasonable choice there.
+          const snapshotIso = isHistorical ? new Date(snapshotDate + 'T12:00:00').toISOString() : new Date().toISOString();
+          if (isHistorical) {
+            // History-only: don't touch the live tracker data.
+            await saveSnapshot(transformed, snapshotIso);
+            if (currentView === 'history') loadAndRenderHistory();
+          } else {
+            issues = transformed;
+            await saveIssues(snapshotDate);
+            await saveSnapshot(issues, snapshotIso);
+            populateFilters();
+            render();
+          }
+        },
+        'Upload'
+      );
+    });
+  }
+
+  async function saveSnapshot(issuesToSnapshot, uploadedAt) {
+    try {
+      await fetch('/api/snapshots', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ issues: issuesToSnapshot, uploadedAt }),
+      });
+    } catch (e) {
+      console.error('Snapshot save failed', e);
+    }
+  }
+
+  function parseAndValidateImport(text) {
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch (e) {
+      return { error: 'That doesn\'t look like valid JSON — check for missing commas, brackets, or quotes.' };
+    }
+    const incoming = Array.isArray(parsed) ? parsed : parsed.issues;
+    if (!Array.isArray(incoming)) {
+      return { error: 'This JSON doesn\'t look like a tracker export (expected an array of issues, or an object with an "issues" array).' };
+    }
+    const looksValid = incoming.every(i => i && typeof i === 'object' && 'id' in i && 'title' in i);
+    if (!looksValid) {
+      return { error: 'This JSON doesn\'t look like a tracker export — some entries are missing expected fields (id, title).' };
+    }
+    return { issues: incoming };
+  }
+
+  function openImportModal() {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.innerHTML = `
+      <div class="modal" style="max-width:600px;">
+        <h2>Import data</h2>
+        <p style="font-size:13px;line-height:1.5;color:var(--ink-soft);margin:0 0 10px;">
+          Choose a previously exported .json file, or paste its contents directly below.
+        </p>
+        <div class="field">
+          <label>Choose file</label>
+          <input type="file" id="import-modal-file" accept="application/json,.json">
+        </div>
+        <div class="field">
+          <label>Or paste JSON here</label>
+          <textarea id="import-modal-textarea" placeholder="Paste exported JSON here..." style="width:100%;height:200px;font-family:monospace;font-size:11.5px;padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--paper);resize:vertical;"></textarea>
+        </div>
+        <p id="import-modal-error" style="font-size:12.5px;color:var(--rust);margin:0 0 8px;display:none;"></p>
+        <div class="modal-actions" style="justify-content:flex-end;gap:8px;">
+          <button class="btn-secondary" id="import-cancel">Cancel</button>
+          <button class="btn-primary" id="import-load">Import</button>
+        </div>
+      </div>
+    `;
+    ROOT.appendChild(backdrop);
+    const close = () => backdrop.remove();
+    backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(); });
+    backdrop.querySelector('#import-cancel').addEventListener('click', close);
+
+    const fileInput = backdrop.querySelector('#import-modal-file');
+    const textarea = backdrop.querySelector('#import-modal-textarea');
+    const errorEl = backdrop.querySelector('#import-modal-error');
+
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => { textarea.value = reader.result; };
+      reader.onerror = () => {
+        errorEl.textContent = 'Could not read that file — try pasting its contents into the box below instead.';
+        errorEl.style.display = 'block';
+      };
+      reader.readAsText(file);
+    });
+
+    backdrop.querySelector('#import-load').addEventListener('click', () => {
+      const text = textarea.value.trim();
+      if (!text) {
+        errorEl.textContent = 'Choose a file above or paste JSON text before importing.';
+        errorEl.style.display = 'block';
+        return;
+      }
+      const result = parseAndValidateImport(text);
+      if (result.error) {
+        errorEl.textContent = result.error;
+        errorEl.style.display = 'block';
+        return;
+      }
+      close();
+      showConfirmModal(
+        `Import ${result.issues.length} issue(s)? This will replace all ${issues.length} issue(s) currently in the tracker.`,
+        async () => {
+          issues = result.issues;
+          migrateRemovedStatuses();
+          await saveIssues();
+          populateFilters();
+          render();
+        },
+        'Import'
+      );
+    });
+  }
+
+  function showConfirmModal(message, onConfirm, confirmLabel) {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.innerHTML = `
+      <div class="modal">
+        <h2>Please confirm</h2>
+        <p style="font-size:13.5px;line-height:1.5;color:var(--ink-soft);margin:0 0 18px;">${message}</p>
+        <div class="modal-actions" style="justify-content:flex-end;gap:8px;">
+          <button class="btn-secondary" id="confirm-cancel">Cancel</button>
+          <button class="btn-primary" id="confirm-ok">${confirmLabel || 'OK'}</button>
+        </div>
+      </div>
+    `;
+    ROOT.appendChild(backdrop);
+    const close = () => backdrop.remove();
+    backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(); });
+    backdrop.querySelector('#confirm-cancel').addEventListener('click', close);
+    backdrop.querySelector('#confirm-ok').addEventListener('click', () => {
+      close();
+      onConfirm();
+    });
+  }
+
+  // ---------- Copy view ----------
+
+  function statusText(status) {
+    return STATUS_LABELS[status] || status;
+  }
+
+  function buildCopyText() {
+    const list = getFiltered();
+    const header = `TIFTON GO-LIVE TRACKER\nGenerated ${todayLabel()}\n${list.length} issue(s)\n`;
+
+    if (!list.length) return header + '\nNo issues match the current filters.';
+
+    if (currentView === 'table') {
+      const rows = list.slice().sort((a,b) => {
+        const statusDiff = STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status);
+        return statusDiff !== 0 ? statusDiff : a.title.localeCompare(b.title);
+      }).map(i => {
+        return [i.title, i.detail, i.devops || '\u2014', i.priority || '\u2014', i.blocker || '\u2014', i.reportedDate ? formatDate(i.reportedDate) : '\u2014', i.targetDate ? formatDate(i.targetDate) : '\u2014', i.notes || '\u2014', i.owner || '\u2014', statusText(i.status)].join('\t');
+      });
+      const cols = ['Title', 'Detail', 'DevOps #', 'Priority', 'Walmart Blocker', 'Reported', 'Target', 'Notes', 'Owner', 'Status'].join('\t');
+      return header + '\n' + cols + '\n' + rows.join('\n');
+    }
+
+    // Board view groups by only the 5 Board statuses (matching what's on
+    // screen); other views that fall through here (Closed, Calendar,
+    // History) still group by the full status list so their own items
+    // (e.g. Closed) aren't silently dropped.
+    const groupOrder = currentView === 'board' ? BOARD_STATUS_ORDER : STATUS_ORDER;
+    const blocks = groupOrder.map(st => {
+      const items = list.filter(i => i.status === st);
+      if (!items.length) return null;
+      const lines = items.map(i => formatIssueLine(i));
+      return `${statusText(st).toUpperCase()} (${items.length})\n${'-'.repeat(30)}\n${lines.join('\n\n')}`;
+    }).filter(Boolean);
+    return header + '\n' + blocks.join('\n\n\n');
+  }
+
+  function formatIssueLine(i) {
+    const devopsPrefix = i.devops ? `DevOps #${i.devops} — ` : '';
+    const owner = i.owner ? `  |  ${i.owner}` : '';
+    const priority = i.priority ? `  |  ${i.priority} priority` : '';
+    const blocker = isBlocker(i.blocker) ? `  |  WALMART BLOCKER${i.blocker === 'Y/N' ? ' (Y/N)' : ''}` : '';
+    const reported = i.reportedDate ? `  |  Reported: ${formatDate(i.reportedDate)}` : '';
+    const target = i.targetDate ? `  |  Target: ${formatDate(i.targetDate)}` : '';
+    const notes = i.notes ? `\nNotes: ${i.notes}` : '';
+    return `${devopsPrefix}${i.title}\n${i.detail}${owner}${priority}${blocker}${reported}${target}${notes}`;
+  }
+
+  // Colors mirrored from the app's CSS variables, hardcoded here since inline
+  // styles are required for HTML pasted into external email clients.
+  const EMAIL_COLORS = {
+    ink: '#1b2027', inkSoft: '#565f6c', line: '#dcd8cc',
+    steel: '#3d5a73', steelBg: '#e4ebef',
+    amber: '#c4791f', amberBg: '#fbeee0',
+    rust: '#a3402f', rustBg: '#f8e6e1',
+    moss: '#4a6b4d', mossBg: '#e7efe4',
+    slate: '#6b7280', slateBg: '#eceae2',
+    teal: '#1f7a72', tealBg: '#daf0ee',
+    plum: '#6b4fa0', plumBg: '#f2ecfb',
+    forest: '#2f6b3a', forestBg: '#e2f0e4',
+  };
+  const STATUS_EMAIL_COLOR = { open: 'rust', inprogress: 'amber', testing: 'steel', readycustomer: 'moss', readyinstall: 'slate', monitoring: 'plum', onhold: 'forest', closed: 'teal' };
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function escNl(s) {
+    return esc(s).replace(/\n/g, '<br>');
+  }
+
+  function priorityEmailColor(p) {
+    if (p === 'High') return 'rust';
+    if (p === 'Medium') return 'amber';
+    if (p === 'Low') return 'slate';
+    return null;
+  }
+
+  function chip(text, colorKey) {
+    const c = EMAIL_COLORS[colorKey], bg = EMAIL_COLORS[colorKey + 'Bg'];
+    return `<span style="display:inline-block;font-size:11px;font-weight:600;color:${c};background:${bg};border-radius:4px;padding:2px 7px;margin:0 6px 4px 0;white-space:nowrap;">${esc(text)}</span>`;
+  }
+
+  function issueMetaHtml(i) {
+    const chips = [];
+    if (i.devops) chips.push(chip('DevOps #' + i.devops, 'steel'));
+    if (i.priority) { const pc = priorityEmailColor(i.priority); if (pc) chips.push(chip(i.priority + ' priority', pc)); }
+    if (isBlocker(i.blocker)) chips.push(chip('WALMART BLOCKER' + (i.blocker === 'Y/N' ? ' (Y/N)' : ''), 'rust'));
+    if (i.reportedDate) chips.push(chip('Reported: ' + formatDate(i.reportedDate), 'slate'));
+    if (i.targetDate) chips.push(chip('Target: ' + formatDate(i.targetDate), 'slate'));
+    return chips.join('');
+  }
+
+  function buildCopyHtml() {
+    const list = getFiltered();
+    const font = "font-family:Arial,Helvetica,sans-serif;";
+    const headerHtml = `
+      <div style="${font}margin-bottom:14px;">
+        <div style="font-size:17px;font-weight:700;color:${EMAIL_COLORS.ink};">TIFTON Go-Live Tracker</div>
+        <div style="font-size:12px;color:${EMAIL_COLORS.inkSoft};">Generated ${esc(todayLabel())} &middot; ${list.length} issue(s)</div>
+      </div>`;
+
+    if (!list.length) {
+      return `<div style="${font}">${headerHtml}<p style="color:${EMAIL_COLORS.inkSoft};">No issues match the current filters.</p></div>`;
+    }
+
+    if (currentView === 'table') {
+      const sorted = list.slice().sort((a,b) => {
+        const statusDiff = STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status);
+        return statusDiff !== 0 ? statusDiff : a.title.localeCompare(b.title);
+      });
+      const th = (label) => `<th style="text-align:left;padding:6px 10px;border-bottom:2px solid ${EMAIL_COLORS.ink};font-size:11px;text-transform:uppercase;letter-spacing:0.03em;color:${EMAIL_COLORS.inkSoft};">${esc(label)}</th>`;
+      const rowsHtml = sorted.map(i => {
+        const statusColor = EMAIL_COLORS[STATUS_EMAIL_COLOR[i.status]];
+        const statusBg = EMAIL_COLORS[STATUS_EMAIL_COLOR[i.status] + 'Bg'];
+        return `
+          <tr>
+            <td style="padding:8px 10px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;">
+              <div style="font-weight:700;font-size:13px;color:${EMAIL_COLORS.ink};">${esc(i.title)}</div>
+              <div style="font-size:12px;color:${EMAIL_COLORS.inkSoft};margin-top:2px;">${escNl(i.detail)}</div>
+              ${i.notes ? `<div style="font-size:11.5px;color:${EMAIL_COLORS.steel};font-style:italic;margin-top:4px;"><strong>Notes:</strong> ${escNl(i.notes)}</div>` : ''}
+            </td>
+            <td style="padding:8px 10px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;font-size:12.5px;">${esc(i.devops) || '&mdash;'}</td>
+            <td style="padding:8px 10px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;font-size:12.5px;">${esc(i.priority) || '&mdash;'}</td>
+            <td style="padding:8px 10px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;font-size:12.5px;${isBlocker(i.blocker) ? `color:${EMAIL_COLORS.rust};font-weight:700;` : ''}">${isBlocker(i.blocker) ? 'YES' + (i.blocker === 'Y/N' ? ' (Y/N)' : '') : (esc(i.blocker) || '&mdash;')}</td>
+            <td style="padding:8px 10px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;font-size:12.5px;">${i.reportedDate ? esc(formatDate(i.reportedDate)) : '&mdash;'}</td>
+            <td style="padding:8px 10px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;font-size:12.5px;">${i.targetDate ? esc(formatDate(i.targetDate)) : '&mdash;'}</td>
+            <td style="padding:8px 10px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;font-size:12.5px;">${esc(i.owner) || '&mdash;'}</td>
+            <td style="padding:8px 10px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;">
+              <span style="display:inline-block;font-size:11px;font-weight:700;color:${statusColor};background:${statusBg};border-radius:100px;padding:3px 10px;white-space:nowrap;">${esc(STATUS_LABELS[i.status])}</span>
+            </td>
+          </tr>`;
+      }).join('');
+      return `
+        <div style="${font}">
+          ${headerHtml}
+          <table style="border-collapse:collapse;width:100%;">
+            <thead><tr>${th('Issue')}${th('DevOps #')}${th('Priority')}${th('Walmart Blocker')}${th('Reported')}${th('Target')}${th('Owner')}${th('Status')}</tr></thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        </div>`;
+    }
+
+    // Board view groups by only the 5 Board statuses (matching what's on
+    // screen); other views that fall through here still group by the
+    // full status list so their own items aren't silently dropped.
+    const groupOrder = currentView === 'board' ? BOARD_STATUS_ORDER : STATUS_ORDER;
+    const sections = groupOrder.map(st => {
+      const items = list.filter(i => i.status === st);
+      if (!items.length) return '';
+      const color = EMAIL_COLORS[STATUS_EMAIL_COLOR[st]];
+      const rowsHtml = items.map(i => `
+        <tr>
+          <td style="padding:10px 12px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;">
+            <div style="font-weight:700;font-size:13.5px;color:${EMAIL_COLORS.ink};">${esc(i.title)}</div>
+            <div style="margin:4px 0;">${issueMetaHtml(i)}</div>
+            <div style="font-size:12px;color:${EMAIL_COLORS.inkSoft};">${escNl(i.detail)}</div>
+            ${i.notes ? `<div style="font-size:11.5px;color:${EMAIL_COLORS.steel};font-style:italic;margin-top:4px;">${escNl(i.notes)}</div>` : ''}
+            ${i.owner ? `<div style="font-size:11.5px;font-weight:700;color:${EMAIL_COLORS.steel};margin-top:6px;">${esc(i.owner)}</div>` : ''}
+          </td>
+        </tr>`).join('');
+      return `
+        <div style="margin-bottom:20px;">
+          <div style="font-size:14px;font-weight:700;color:${color};border-bottom:2px solid ${color};padding-bottom:4px;margin-bottom:8px;">
+            ${esc(STATUS_LABELS[st])} <span style="font-weight:400;color:${EMAIL_COLORS.inkSoft};">(${items.length})</span>
+          </div>
+          <table style="border-collapse:collapse;width:100%;">
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        </div>`;
+    }).filter(Boolean).join('');
+
+    return `<div style="${font}">${headerHtml}${sections}</div>`;
+  }
+
+  // Copies rich HTML by rendering it off-screen, selecting it as a real DOM
+  // range, and using the classic execCommand('copy'). Unlike the modern async
+  // Clipboard API (which some sandboxed hosts silently refuse for anything
+  // beyond plain text), this selection-based copy is what browsers have used
+  // for rich copy/paste for years and reliably places BOTH an HTML and a
+  // plain-text representation on the clipboard in one step.
+  function copyRichViaSelection(html, text) {
+    const container = document.createElement('div');
+    container.setAttribute('contenteditable', 'true');
+    container.style.position = 'fixed';
+    container.style.top = '0';
+    container.style.left = '0';
+    container.style.opacity = '0.01';
+    container.style.pointerEvents = 'none';
+    container.style.zIndex = '-1';
+    container.innerHTML = html;
+    document.body.appendChild(container);
+
+    let ok = false;
+    try {
+      const range = document.createRange();
+      range.selectNodeContents(container);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      ok = document.execCommand('copy');
+      sel.removeAllRanges();
+    } catch (e) {
+      ok = false;
+    }
+    container.remove();
+    return ok;
+  }
+
+  async function copyCurrentView() {
+    const text = buildCopyText();
+    const html = buildCopyHtml();
+    const btn = document.getElementById('btn-copy-view');
+    let ok = copyRichViaSelection(html, text);
+
+    if (!ok) {
+      // Fall back to the modern Clipboard API with both MIME types
+      try {
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            'text/plain': new Blob([text], { type: 'text/plain' }),
+            'text/html': new Blob([html], { type: 'text/html' }),
+          })
+        ]);
+        ok = true;
+      } catch (e) {
+        // Fall back further to plain-text-only clipboard write
+        try {
+          await navigator.clipboard.writeText(text);
+          ok = true;
+        } catch (e2) {
+          // Final fallback for environments where the Clipboard API is unavailable/blocked
+          try {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.focus();
+            ta.select();
+            ok = document.execCommand('copy');
+            ta.remove();
+          } catch (e3) {
+            ok = false;
+          }
+        }
+      }
+    }
+    const original = btn.textContent;
+    btn.textContent = ok ? 'Copied!' : 'Copy failed';
+    btn.classList.toggle('copied', ok);
+    setTimeout(() => {
+      btn.textContent = original;
+      btn.classList.remove('copied');
+    }, 1600);
+  }
+
+  function openModal(id) {
+    editingId = id || null;
+    const issue = id ? issues.find(i => i.id === id) : { title:'', detail:'', status: STATUS_ORDER[0], owner:'', devops:'', priority:'', blocker:'', targetDate:'', notes:'', reportedDate: todayISO() };
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.innerHTML = `
+      <div class="modal">
+        <h2>${id ? 'Edit issue' : 'Add issue'}</h2>
+        <div class="field"><label>Owner</label><input type="text" id="m-owner" value="${issue.owner||''}" placeholder="optional"></div>
+        <div class="field"><label>Title</label><input type="text" id="m-title" value="${issue.title}" placeholder="Short summary"></div>
+        <div class="field"><label>Detail</label><textarea id="m-detail" placeholder="Full description">${issue.detail}</textarea></div>
+        <div class="field-row">
+          <div class="field"><label>DevOps #</label><input type="text" id="m-devops" value="${issue.devops||''}" placeholder="e.g. 24714 (optional)"></div>
+          <div class="field">
+            <label>Priority</label>
+            <select id="m-priority">
+              <option value="" ${!issue.priority ? 'selected' : ''}>&mdash;</option>
+              <option value="High" ${issue.priority==='High'?'selected':''}>High</option>
+              <option value="Medium" ${issue.priority==='Medium'?'selected':''}>Medium</option>
+              <option value="Low" ${issue.priority==='Low'?'selected':''}>Low</option>
+            </select>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Reported date</label><input type="date" id="m-reported" value="${issue.reportedDate||''}"></div>
+          <div class="field"><label>Target completion date</label><input type="date" id="m-target" value="${issue.targetDate||''}"></div>
+        </div>
+        <div class="field">
+          <label>Walmart blocker</label>
+          <select id="m-blocker">
+            <option value="" ${!issue.blocker ? 'selected' : ''}>&mdash;</option>
+            <option value="Y" ${issue.blocker==='Y'?'selected':''}>Y</option>
+            <option value="N" ${issue.blocker==='N'?'selected':''}>N</option>
+            <option value="Y/N" ${issue.blocker==='Y/N'?'selected':''}>Y/N (unclear)</option>
+          </select>
+        </div>
+        <div class="field"><label>Notes</label><textarea id="m-notes" placeholder="optional">${issue.notes||''}</textarea></div>
+        <div class="field">
+          <label>Status</label>
+          <select id="m-status">
+            ${STATUS_ORDER.map(s => `<option value="${s}" ${issue.status===s?'selected':''}>${STATUS_LABELS[s]}</option>`).join('')}
+          </select>
+        </div>
+        <div class="modal-actions">
+          <div>${id ? '<button class="btn-delete" id="m-delete">Delete</button>' : ''}</div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn-secondary" id="m-cancel">Cancel</button>
+            <button class="btn-primary" id="m-save">Save</button>
+          </div>
+        </div>
+      </div>
+    `;
+    ROOT.appendChild(backdrop);
+
+    backdrop.addEventListener('click', (e) => { if (e.target === backdrop) backdrop.remove(); });
+    document.getElementById('m-cancel').addEventListener('click', () => backdrop.remove());
+    if (id) {
+      document.getElementById('m-delete').addEventListener('click', async () => {
+        issues = issues.filter(i => i.id !== id);
+        await saveIssues();
+        backdrop.remove();
+        populateFilters();
+        render();
+      });
+    }
+    document.getElementById('m-save').addEventListener('click', async () => {
+      const data = {
+        title: document.getElementById('m-title').value.trim(),
+        detail: document.getElementById('m-detail').value.trim(),
+        status: document.getElementById('m-status').value,
+        owner: document.getElementById('m-owner').value.trim(),
+        devops: document.getElementById('m-devops').value.trim(),
+        priority: document.getElementById('m-priority').value,
+        blocker: document.getElementById('m-blocker').value,
+        reportedDate: document.getElementById('m-reported').value,
+        targetDate: document.getElementById('m-target').value,
+        notes: document.getElementById('m-notes').value.trim(),
+      };
+      if (!data.title) { document.getElementById('m-title').focus(); return; }
+      if (id) {
+        const idx = issues.findIndex(i => i.id === id);
+        issues[idx] = { ...issues[idx], ...data };
+      } else {
+        data.id = 'issue-' + Date.now();
+        issues.push(data);
+      }
+      await saveIssues();
+      backdrop.remove();
+      populateFilters();
+      render();
+    });
+  }
+
+  // Event bindings
+  document.getElementById('btn-copy-view').addEventListener('click', copyCurrentView);
+  document.getElementById('btn-export').addEventListener('click', exportData);
+  document.getElementById('btn-network-diagram').addEventListener('click', openNetworkDiagramModal);
+  document.getElementById('btn-import').addEventListener('click', openImportModal);
+  document.getElementById('btn-upload-raid').addEventListener('click', openUploadRaidModal);
+  document.getElementById('filter-status').addEventListener('change', render);
+  document.getElementById('filter-blocker').addEventListener('change', render);
+  document.getElementById('filter-missing').addEventListener('change', render);
+  document.getElementById('search').addEventListener('input', render);
+  document.querySelectorAll('#view-toggle button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentView = btn.getAttribute('data-view');
+      document.querySelectorAll('#view-toggle button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      render();
+    });
+  });
+
+  document.getElementById('board-scrollbar-proxy').addEventListener('scroll', (e) => {
+    if (activeBoardEl) activeBoardEl.scrollLeft = e.target.scrollLeft;
+  });
+  window.addEventListener('resize', () => {
+    if (currentView === 'board') syncBoardScrollbar();
+  });
+
+  (async function init() {
+    await loadIssues();
+    populateFilters();
+    render();
+  })();
+})();
+</script>
+
+</body>
+</html>
