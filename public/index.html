@@ -1450,11 +1450,11 @@
   // where the action itself requires it (see the handlers below).
   function renderFddBody(list) {
     const body = document.getElementById('body');
-    const fddItems = list.filter(isFddItem);
+    const fddItems = list.filter(i => isFddItem(i) && i.status !== 'closed');
     body.innerHTML = `
       <div class="history-wrap">
         <div class="history-header">FDD Tracker <span class="count">(${fddItems.length} item${fddItems.length === 1 ? '' : 's'})</span></div>
-        <p class="history-hint">Items are matched automatically when "FDD" appears in the title, target date, or notes/description — including an FDD ID like "FDD 17676". Upload each item's FDD document in its own row — files are saved to the shared tracker (up to ~8 MB each) so everyone sees the same document.</p>
+        <p class="history-hint">Items are matched automatically when "FDD" appears in the title, target date, or notes/description — including an FDD ID like "FDD 17676" (Closed items are left off this list). Upload each item's FDD document in its own row — files are saved to the shared tracker (up to ~8 MB each) so everyone sees the same document.</p>
         ${renderFddItemsList(fddItems)}
       </div>
     `;
