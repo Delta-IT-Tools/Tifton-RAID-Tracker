@@ -1266,7 +1266,10 @@
     // Items with no DevOps # in the NEWER upload can't be matched against
     // anything (they've got a one-time-use id), so they're neither "added"
     // nor "removed" — just flagged so they don't get miscounted either way.
-    const unmatched = newer.filter(i => !isTrackableId(i.id));
+    // Closed items are the one exception: once something's closed there's
+    // no further need to track it across uploads, so a closed item with no
+    // DevOps # is simply not worth flagging.
+    const unmatched = newer.filter(i => !isTrackableId(i.id) && i.status !== 'closed');
     return { added, removed, statusChanged, unmatched };
   }
 
@@ -1335,7 +1338,8 @@
     const noDevopsCounts = {};
     snapshots.forEach(s => {
       const d = detailById[s.id];
-      noDevopsCounts[s.id] = d ? d.issues.filter(i => !isTrackableId(i.id)).length : 0;
+      // Closed items with no DevOps # aren't flagged — nothing left to track.
+      noDevopsCounts[s.id] = d ? d.issues.filter(i => !isTrackableId(i.id) && i.status !== 'closed').length : 0;
     });
 
     const tableRows = snapshots.map((s, i) => {
