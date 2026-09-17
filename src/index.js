@@ -70,6 +70,24 @@ export default {
       return new Response("Method not allowed", { status: 405 });
     }
 
+    // ---- ONE-TIME MIGRATION ROUTE ----
+    // Re-derives every stored issue's stable `id` from its `devops` field
+    // instead of the old `raidNumber`-based id (RAID # is just a
+    // spreadsheet row position and isn't stable across uploads — see the
+    // client-side comment above transformRaidRow() in index.html for the
+    // full reasoning). This fixes up data already sitting in D1 (the
+    // current live issue list, plus every historical raid_snapshots row)
+    // so existing History stays comparable going forward without anyone
+    // needing to re-upload old RAID logs.
+    //
+    // Safe to run more than once by accident — it's a pure recomputation
+    // from each item's own `devops`/`raidNumber` fields, not something
+    // that accumulates state. Intended to be triggered once, by hand
+    // (see README), then this route can be deleted in a later deploy.
+    if (url.pathname === "/api/migrate-devops-ids" && request.method === "POST") {
+      return handleMigrateDevopsIds(env);
+    }
+
     // Authenticated — serve the static tracker (public/index.html, etc).
     // The response's Content-Type header is what actually controls how the
     // browser decodes the bytes — the <meta charset="UTF-8"> tag in the
@@ -494,5 +512,103 @@ async function handlePostSnapshot(request, env) {
     return jsonResponse({ ok: true, id: result.meta.last_row_id, uploadedAt });
   } catch (e) {
     return jsonResponse({ error: "Database write failed: " + e.message }, 500);
+  }
+}
+
+// ---------- One-time migration: re-derive issue ids from DevOps # ----------
+//
+// Background: every stored issue used to get its stable `id` from RAID #
+// (`'raid-' + raidNumber`). RAID # is just that row's position in the
+// source Excel sheet, so it shifts whenever rows are added, removed, or
+// resorted — which meant History's added/removed diff kept treating
+// unchanged items as "new" every upload. The client (index.html) now
+// derives `id` from DevOps # instead (`'devops-' + devopsNumber`, since
+// that's assigned to the actual issue and doesn't move), with items that
+// have no DevOps # yet getting a distinct, deliberately-unmatchable
+// `nodevops-...` id so they're flagged rather than silently miscounted.
+//
+// This endpoint applies that same recomputation to data already sitting
+// in D1 — the current live issue list (tracker_data, id='issues') and
+// every historical raid_snapshots row — using each item's own stored
+// `devops`/`raidNumber` fields. No RAID log needs to be re-uploaded.
+//
+// Idempotent: re-running this is harmless. It's a pure recomputation from
+// fields already on each item, not something that accumulates state.
+function recomputeIssueId(item, index) {
+  const devops = (item && item.devops ? item.devops : "").toString().trim();
+  const raidNumber = (item && item.raidNumber ? item.raidNumber : "").toString().trim();
+  if (devops) return "devops-" + devops;
+  return "nodevops-" + (raidNumber || "row") + "-" + index;
+}
+
+function migrateIssueArray(issues) {
+  if (!Array.isArray(issues)) return { issues, changed: 0 };
+  let changed = 0;
+  const migrated = issues.map((item, index) => {
+    const newId = recomputeIssueId(item, index);
+    if (newId !== item.id) changed++;
+    return Object.assign({}, item, { id: newId });
+  });
+  return { issues: migrated, changed };
+}
+
+async function handleMigrateDevopsIds(env) {
+  if (!env.DB) {
+    return jsonResponse({ error: "D1 database not bound. See README.md." }, 500);
+  }
+
+  const report = { liveIssues: null, snapshots: [] };
+
+  try {
+    // 1. The current live issue list (what the Board/Table/etc. show).
+    const liveRow = await env.DB
+      .prepare("SELECT data FROM tracker_data WHERE id = ?")
+      .bind(ROW_ID)
+      .first();
+    if (liveRow) {
+      let liveIssues;
+      try {
+        liveIssues = JSON.parse(liveRow.data);
+      } catch (e) {
+        liveIssues = null;
+      }
+      if (Array.isArray(liveIssues)) {
+        const { issues: migrated, changed } = migrateIssueArray(liveIssues);
+        await env.DB
+          .prepare("UPDATE tracker_data SET data = ? WHERE id = ?")
+          .bind(JSON.stringify(migrated), ROW_ID)
+          .run();
+        report.liveIssues = { totalItems: migrated.length, idsChanged: changed };
+      }
+    }
+
+    // 2. Every historical upload snapshot.
+    const { results } = await env.DB
+      .prepare("SELECT id, data FROM raid_snapshots")
+      .all();
+
+    for (const row of results || []) {
+      let issues;
+      try {
+        issues = JSON.parse(row.data);
+      } catch (e) {
+        report.snapshots.push({ id: row.id, error: "Could not parse stored data — skipped." });
+        continue;
+      }
+      if (!Array.isArray(issues)) {
+        report.snapshots.push({ id: row.id, error: "Stored data was not an array — skipped." });
+        continue;
+      }
+      const { issues: migrated, changed } = migrateIssueArray(issues);
+      await env.DB
+        .prepare("UPDATE raid_snapshots SET data = ? WHERE id = ?")
+        .bind(JSON.stringify(migrated), row.id)
+        .run();
+      report.snapshots.push({ id: row.id, totalItems: migrated.length, idsChanged: changed });
+    }
+
+    return jsonResponse({ ok: true, report });
+  } catch (e) {
+    return jsonResponse({ error: "Migration failed: " + e.message, report }, 500);
   }
 }
