@@ -648,27 +648,43 @@
 
 
   /* FDD view */
-  #tifton-tracker .fdd-upload {
-    background: var(--paper);
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 14px 16px;
+  #tifton-tracker .fdd-table thead th {
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 700;
   }
-  #tifton-tracker .fdd-upload-label {
-    display: block;
-    font-size: 11.5px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--ink-soft);
-    margin-bottom: 6px;
-  }
-  #tifton-tracker .fdd-upload-file-row {
+  #tifton-tracker .fdd-row-controls {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    margin-bottom: 12px;
-    font-size: 13.5px;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  #tifton-tracker .fdd-row-upload-input {
+    font-size: 11.5px;
+    max-width: 190px;
+  }
+  #tifton-tracker .fdd-row-file-name {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink);
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  #tifton-tracker .fdd-row-file-size {
+    font-size: 11px;
+    color: var(--ink-soft);
+    white-space: nowrap;
+  }
+  #tifton-tracker .fdd-row-view-btn {
+    padding: 4px 10px;
+    font-size: 12px;
+  }
+  #tifton-tracker .fdd-detail-row td {
+    padding: 12px;
+    background: var(--paper);
+    border-bottom: 1px solid var(--line);
   }
   #tifton-tracker .fdd-preview-frame {
     width: 100%;
@@ -922,10 +938,11 @@
   })();
   let selectedCalendarDate = null;
   let editingId = null;
-  // Locally-selected file for the FDD "upload for review" section — kept
-  // in memory only (not sent to the server/D1), so it previews in this
-  // browser tab until cleared or the page is refreshed.
-  let fddReviewFile = null;
+  // Locally-selected FDD review files, one per issue — kept in memory only
+  // (not sent to the server/D1), so previews last only for this browser
+  // tab until cleared or the page is refreshed.
+  let fddReviewFiles = {}; // issue id -> {name, size, type, blobUrl}
+  let expandedFddId = null; // which row's preview is currently open, if any
   let activeBoardEl = null;
 
   async function loadIssues() {
@@ -1323,11 +1340,12 @@
       return statusDiff !== 0 ? statusDiff : a.title.localeCompare(b.title);
     });
     return `
-      <table>
-        <thead><tr><th>Issue</th><th>FDD #</th><th>Status</th><th>Target</th><th>Owner</th></tr></thead>
+      <table class="fdd-table">
+        <thead><tr><th>Issue</th><th>FDD #</th><th>Status</th><th>Target</th><th>FDD Document</th></tr></thead>
         <tbody>
           ${sorted.map(i => {
             const fddNum = extractFddNumber(i);
+            const isExpanded = expandedFddId === i.id && fddReviewFiles[i.id];
             return `
               <tr data-id="${i.id}">
                 <td>
@@ -1336,8 +1354,9 @@
                 <td>${fddNum ? `FDD ${fddNum}` : '<span class="status-pill unmatched">FDD# REQUIRED</span>'}</td>
                 <td><span class="status-pill ${i.status}">${STATUS_LABELS[i.status]}</span></td>
                 <td>${i.targetDate ? formatDate(i.targetDate) : '—'}</td>
-                <td>${i.owner || '—'}</td>
+                <td>${renderFddRowUploadCell(i)}</td>
               </tr>
+              ${isExpanded ? `<tr class="fdd-detail-row"><td colspan="5">${renderFddPreview(fddReviewFiles[i.id])}</td></tr>` : ''}
             `;
           }).join('')}
         </tbody>
@@ -1345,31 +1364,35 @@
     `;
   }
 
-  function renderFddUploadSection() {
-    if (!fddReviewFile) {
+  // Per-item upload control — each FDD-related line item gets its own file
+  // slot, since a given RAID/FDD item is reviewed against its own specific
+  // document, not a single document for the whole tracker.
+  function renderFddRowUploadCell(issue) {
+    const f = fddReviewFiles[issue.id];
+    if (!f) {
       return `
-        <div class="fdd-upload">
-          <label class="fdd-upload-label" for="fdd-upload-input">Upload FDD for review</label>
-          <input type="file" id="fdd-upload-input" accept=".pdf,.doc,.docx">
-          <p class="history-hint">Select a Functional Design Document (PDF or Word) to preview here. This stays local to your browser only — it isn't saved to the shared tracker, and clearing/refreshing the page removes it.</p>
+        <div class="fdd-row-controls">
+          <input type="file" class="fdd-row-upload-input" data-fdd-issue-id="${issue.id}" accept=".pdf,.doc,.docx">
         </div>
       `;
     }
-    const f = fddReviewFile;
     const sizeLabel = f.size > 1024 * 1024 ? (f.size / (1024 * 1024)).toFixed(1) + ' MB' : Math.max(1, Math.round(f.size / 1024)) + ' KB';
-    const canPreviewInline = f.type === 'application/pdf';
-    const previewHtml = canPreviewInline
-      ? `<iframe src="${f.blobUrl}" class="fdd-preview-frame" title="FDD preview"></iframe>`
-      : `<div class="empty">Preview isn't available for this file type in-browser. <a href="${f.blobUrl}" download="${f.name}">Download ${f.name}</a> to view it.</div>`;
+    const viewing = expandedFddId === issue.id;
     return `
-      <div class="fdd-upload">
-        <div class="fdd-upload-file-row">
-          <div><strong>${f.name}</strong><span class="history-hint" style="margin:0 0 0 8px;display:inline;">(${sizeLabel})</span></div>
-          <button type="button" class="btn-secondary" id="fdd-upload-clear">Remove</button>
-        </div>
-        ${previewHtml}
+      <div class="fdd-row-controls fdd-row-file">
+        <span class="fdd-row-file-name" title="${f.name}">${f.name}</span>
+        <span class="fdd-row-file-size">(${sizeLabel})</span>
+        <button type="button" class="btn-secondary fdd-row-view-btn" data-fdd-view-id="${issue.id}">${viewing ? 'Hide' : 'View'}</button>
+        <button type="button" class="history-delete-btn fdd-row-remove-btn" data-fdd-remove-id="${issue.id}" title="Remove this file">&times;</button>
       </div>
     `;
+  }
+
+  function renderFddPreview(f) {
+    const canPreviewInline = f.type === 'application/pdf';
+    return canPreviewInline
+      ? `<iframe src="${f.blobUrl}" class="fdd-preview-frame" title="FDD preview"></iframe>`
+      : `<div class="empty">Preview isn't available for this file type in-browser. <a href="${f.blobUrl}" download="${f.name}">Download ${f.name}</a> to view it.</div>`;
   }
 
   function renderFddView(list) {
@@ -1377,11 +1400,8 @@
     return `
       <div class="history-wrap">
         <div class="history-header">FDD Tracker <span class="count">(${fddItems.length} item${fddItems.length === 1 ? '' : 's'})</span></div>
-        <p class="history-hint">Items are matched automatically when "FDD" appears in the title, target date, or notes/description — including an FDD ID like "FDD 17676".</p>
-        ${renderFddUploadSection()}
-        <div style="margin-top:18px;">
-          ${renderFddItemsList(fddItems)}
-        </div>
+        <p class="history-hint">Items are matched automatically when "FDD" appears in the title, target date, or notes/description — including an FDD ID like "FDD 17676". Upload each item's FDD document in its own row to preview it here; files stay local to your browser only and aren't saved to the shared tracker.</p>
+        ${renderFddItemsList(fddItems)}
       </div>
     `;
   }
@@ -1871,7 +1891,10 @@
     }
 
     body.querySelectorAll('[data-id]').forEach(el => {
-      el.addEventListener('click', () => openModal(el.getAttribute('data-id')));
+      el.addEventListener('click', (e) => {
+        if (e.target.closest('.fdd-row-controls')) return;
+        openModal(el.getAttribute('data-id'));
+      });
     });
 
     if (currentView === 'calendar') {
@@ -1896,24 +1919,38 @@
     }
 
     if (currentView === 'fdd') {
-      const fddInput = document.getElementById('fdd-upload-input');
-      if (fddInput) {
-        fddInput.addEventListener('change', () => {
-          const file = fddInput.files[0];
+      body.querySelectorAll('.fdd-row-upload-input').forEach(input => {
+        input.addEventListener('click', (e) => e.stopPropagation());
+        input.addEventListener('change', () => {
+          const file = input.files[0];
           if (!file) return;
-          if (fddReviewFile && fddReviewFile.blobUrl) URL.revokeObjectURL(fddReviewFile.blobUrl);
-          fddReviewFile = { name: file.name, size: file.size, type: file.type, blobUrl: URL.createObjectURL(file) };
+          const issueId = input.getAttribute('data-fdd-issue-id');
+          const existing = fddReviewFiles[issueId];
+          if (existing && existing.blobUrl) URL.revokeObjectURL(existing.blobUrl);
+          fddReviewFiles[issueId] = { name: file.name, size: file.size, type: file.type, blobUrl: URL.createObjectURL(file) };
+          expandedFddId = issueId; // open the preview immediately after upload
           render();
         });
-      }
-      const fddClearBtn = document.getElementById('fdd-upload-clear');
-      if (fddClearBtn) {
-        fddClearBtn.addEventListener('click', () => {
-          if (fddReviewFile && fddReviewFile.blobUrl) URL.revokeObjectURL(fddReviewFile.blobUrl);
-          fddReviewFile = null;
+      });
+      body.querySelectorAll('.fdd-row-view-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const issueId = btn.getAttribute('data-fdd-view-id');
+          expandedFddId = expandedFddId === issueId ? null : issueId;
           render();
         });
-      }
+      });
+      body.querySelectorAll('.fdd-row-remove-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const issueId = btn.getAttribute('data-fdd-remove-id');
+          const existing = fddReviewFiles[issueId];
+          if (existing && existing.blobUrl) URL.revokeObjectURL(existing.blobUrl);
+          delete fddReviewFiles[issueId];
+          if (expandedFddId === issueId) expandedFddId = null;
+          render();
+        });
+      });
     }
 
     syncBoardScrollbar();
