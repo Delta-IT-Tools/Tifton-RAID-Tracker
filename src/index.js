@@ -70,6 +70,26 @@ export default {
       return new Response("Method not allowed", { status: 405 });
     }
 
+    // FDD (Functional Design Document) file storage — one file per issue,
+    // stored as base64 text in D1 so it persists across page refreshes and
+    // is shared with everyone using the tracker, not just kept in one
+    // browser tab. /api/fdd (no id) returns lightweight metadata for every
+    // stored file (name/size/type/uploadedAt, no file content) so the FDD
+    // list can show what's there without pulling every file's bytes at
+    // once; /api/fdd/<issueId> reads or writes one file's full content.
+    if (url.pathname === "/api/fdd") {
+      if (request.method === "GET") return handleGetFddList(env);
+      return new Response("Method not allowed", { status: 405 });
+    }
+
+    if (url.pathname.startsWith("/api/fdd/")) {
+      const issueId = decodeURIComponent(url.pathname.slice("/api/fdd/".length));
+      if (request.method === "GET") return handleGetFddDetail(env, issueId);
+      if (request.method === "PUT") return handlePutFdd(request, env, issueId);
+      if (request.method === "DELETE") return handleDeleteFdd(env, issueId);
+      return new Response("Method not allowed", { status: 405 });
+    }
+
     // ---- ONE-TIME MIGRATION ROUTE ----
     // Re-derives every stored issue's stable `id` from its `devops` field
     // instead of the old `raidNumber`-based id (RAID # is just a
@@ -612,3 +632,127 @@ async function handleMigrateDevopsIds(env) {
     return jsonResponse({ error: "Migration failed: " + e.message, report }, 500);
   }
 }
+
+// ---------- FDD document storage ----------
+//
+// One row per issue (issue_id is the primary key, so uploading a new file
+// for the same issue replaces the previous one). The file itself is
+// stored as base64 text — D1 doesn't have a separate blob storage product
+// bound to this Worker, so this keeps everything in the one database
+// that's already set up, at the cost of the usual ~33% base64 size
+// overhead. MAX_FDD_BASE64_LENGTH keeps individual files comfortably
+// under D1's per-value size ceiling; if you need to store larger FDDs
+// than that regularly, this would need to move to Cloudflare R2 (object
+// storage) instead, bound as a separate step.
+const MAX_FDD_BASE64_LENGTH = 14_000_000; // ~10 MB of actual file content
+
+async function handleGetFddList(env) {
+  if (!env.DB) {
+    return jsonResponse({ error: "D1 database not bound. See README.md." }, 500);
+  }
+  try {
+    const { results } = await env.DB
+      .prepare("SELECT issue_id, filename, content_type, size, uploaded_at FROM fdd_documents")
+      .all();
+    const files = (results || []).map((r) => ({
+      issueId: r.issue_id,
+      filename: r.filename,
+      contentType: r.content_type,
+      size: r.size,
+      uploadedAt: r.uploaded_at,
+    }));
+    return jsonResponse({ files });
+  } catch (e) {
+    return jsonResponse({ error: "Database read failed: " + e.message }, 500);
+  }
+}
+
+async function handleGetFddDetail(env, issueId) {
+  if (!env.DB) {
+    return jsonResponse({ error: "D1 database not bound. See README.md." }, 500);
+  }
+  if (!issueId) {
+    return jsonResponse({ error: "Missing issue id." }, 400);
+  }
+  try {
+    const row = await env.DB
+      .prepare("SELECT issue_id, filename, content_type, size, data, uploaded_at FROM fdd_documents WHERE issue_id = ?")
+      .bind(issueId)
+      .first();
+    if (!row) {
+      return jsonResponse({ error: "No FDD file stored for this item." }, 404);
+    }
+    return jsonResponse({
+      issueId: row.issue_id,
+      filename: row.filename,
+      contentType: row.content_type,
+      size: row.size,
+      data: row.data,
+      uploadedAt: row.uploaded_at,
+    });
+  } catch (e) {
+    return jsonResponse({ error: "Database read failed: " + e.message }, 500);
+  }
+}
+
+async function handlePutFdd(request, env, issueId) {
+  if (!env.DB) {
+    return jsonResponse({ error: "D1 database not bound. See README.md." }, 500);
+  }
+  if (!issueId) {
+    return jsonResponse({ error: "Missing issue id." }, 400);
+  }
+  let payload;
+  try {
+    payload = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: "Request body is not valid JSON." }, 400);
+  }
+  const filename = payload && payload.filename;
+  const data = payload && payload.data;
+  const contentType = (payload && payload.contentType) || "";
+  const size = payload && Number.isFinite(payload.size) ? payload.size : (data ? data.length : 0);
+
+  if (!filename || typeof data !== "string" || !data) {
+    return jsonResponse({ error: "Expected { filename, contentType, size, data } where data is base64 file content." }, 400);
+  }
+  if (data.length > MAX_FDD_BASE64_LENGTH) {
+    return jsonResponse({ error: "File is too large to store (limit is roughly 10 MB)." }, 413);
+  }
+
+  const now = new Date().toISOString();
+  try {
+    await env.DB
+      .prepare(
+        `INSERT INTO fdd_documents (issue_id, filename, content_type, size, data, uploaded_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(issue_id) DO UPDATE SET
+           filename = excluded.filename,
+           content_type = excluded.content_type,
+           size = excluded.size,
+           data = excluded.data,
+           uploaded_at = excluded.uploaded_at`
+      )
+      .bind(issueId, filename, contentType, size, data, now)
+      .run();
+    return jsonResponse({ ok: true, uploadedAt: now });
+  } catch (e) {
+    return jsonResponse({ error: "Database write failed: " + e.message }, 500);
+  }
+}
+
+async function handleDeleteFdd(env, issueId) {
+  if (!env.DB) {
+    return jsonResponse({ error: "D1 database not bound. See README.md." }, 500);
+  }
+  if (!issueId) {
+    return jsonResponse({ error: "Missing issue id." }, 400);
+  }
+  try {
+    await env.DB.prepare("DELETE FROM fdd_documents WHERE issue_id = ?").bind(issueId).run();
+    return jsonResponse({ ok: true });
+  } catch (e) {
+    return jsonResponse({ error: "Database delete failed: " + e.message }, 500);
+  }
+}
+

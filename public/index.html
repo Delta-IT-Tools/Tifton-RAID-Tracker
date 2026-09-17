@@ -949,8 +949,14 @@
   // Locally-selected FDD review files, one per issue — kept in memory only
   // (not sent to the server/D1), so previews last only for this browser
   // tab until cleared or the page is refreshed.
-  let fddReviewFiles = {}; // issue id -> {name, size, type, blobUrl}
+  // Per-issue FDD file cache. Metadata (filename/size/contentType/
+  // uploadedAt) mirrors what's stored server-side in D1; blobUrl/loaded
+  // are populated lazily in THIS browser tab only, either right after an
+  // upload (built straight from the File object) or the first time a
+  // stored file's "View" is clicked (fetched and decoded from the server).
+  let fddDocs = {}; // issue id -> {filename, contentType, size, uploadedAt, blobUrl?, loaded, loading?, uploading?}
   let expandedFddId = null; // which row's preview is currently open, if any
+  const MAX_FDD_FILE_BYTES = 8 * 1024 * 1024; // ~8 MB raw file (matches the server's base64 size ceiling with room to spare)
   let activeBoardEl = null;
 
   async function loadIssues() {
@@ -1339,6 +1345,37 @@
     return m ? m[1] : null;
   }
 
+  function formatFileSize(bytes) {
+    if (bytes == null) return '';
+    return bytes > 1024 * 1024 ? (bytes / (1024 * 1024)).toFixed(1) + ' MB' : Math.max(1, Math.round(bytes / 1024)) + ' KB';
+  }
+
+  // Reads a File as base64 (stripping the "data:<mime>;base64," prefix
+  // that FileReader's readAsDataURL includes) so it can be sent as plain
+  // JSON text to /api/fdd/<issueId>.
+  function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result || '';
+        const idx = result.indexOf(',');
+        resolve(idx !== -1 ? result.slice(idx + 1) : result);
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // Reverses that — turns base64 text fetched back from the server into a
+  // blob URL the <iframe>/download link can actually use.
+  function base64ToBlobUrl(base64, contentType) {
+    const byteChars = atob(base64);
+    const byteNumbers = new Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+    const blob = new Blob([new Uint8Array(byteNumbers)], { type: contentType || 'application/octet-stream' });
+    return URL.createObjectURL(blob);
+  }
+
   function renderFddItemsList(fddItems) {
     if (!fddItems.length) {
       return '<div class="empty">No FDD-related items match the current filters. An item is picked up here when "FDD" appears in its title, target date, or notes/description — including an FDD ID like "FDD 17676".</div>';
@@ -1353,7 +1390,8 @@
         <tbody>
           ${sorted.map(i => {
             const fddNum = extractFddNumber(i);
-            const isExpanded = expandedFddId === i.id && fddReviewFiles[i.id];
+            const doc = fddDocs[i.id];
+            const isExpanded = expandedFddId === i.id && doc && doc.blobUrl;
             return `
               <tr data-id="${i.id}">
                 <td>
@@ -1364,7 +1402,7 @@
                 <td>${i.targetDate ? formatDate(i.targetDate) : '—'}</td>
                 <td>${renderFddRowUploadCell(i)}</td>
               </tr>
-              ${isExpanded ? `<tr class="fdd-detail-row"><td colspan="5">${renderFddPreview(fddReviewFiles[i.id])}</td></tr>` : ''}
+              ${isExpanded ? `<tr class="fdd-detail-row"><td colspan="5">${renderFddPreview(doc)}</td></tr>` : ''}
             `;
           }).join('')}
         </tbody>
@@ -1376,42 +1414,196 @@
   // slot, since a given RAID/FDD item is reviewed against its own specific
   // document, not a single document for the whole tracker.
   function renderFddRowUploadCell(issue) {
-    const f = fddReviewFiles[issue.id];
-    if (!f) {
+    const doc = fddDocs[issue.id];
+    if (!doc) {
       return `
         <div class="fdd-row-controls">
           <input type="file" class="fdd-row-upload-input" data-fdd-issue-id="${issue.id}" accept=".pdf,.doc,.docx">
         </div>
       `;
     }
-    const sizeLabel = f.size > 1024 * 1024 ? (f.size / (1024 * 1024)).toFixed(1) + ' MB' : Math.max(1, Math.round(f.size / 1024)) + ' KB';
+    if (doc.uploading) {
+      return `<div class="fdd-row-controls"><span class="fdd-row-file-size">Uploading&hellip;</span></div>`;
+    }
     const viewing = expandedFddId === issue.id;
+    const viewLabel = doc.loading ? 'Loading&hellip;' : (viewing ? 'Hide' : 'View');
     return `
       <div class="fdd-row-controls fdd-row-file">
-        <span class="fdd-row-file-name" title="${f.name}">${f.name}</span>
-        <span class="fdd-row-file-size">(${sizeLabel})</span>
-        <button type="button" class="btn-secondary fdd-row-view-btn" data-fdd-view-id="${issue.id}">${viewing ? 'Hide' : 'View'}</button>
+        <span class="fdd-row-file-name" title="${doc.filename}">${doc.filename}</span>
+        <span class="fdd-row-file-size">(${formatFileSize(doc.size)})</span>
+        <button type="button" class="btn-secondary fdd-row-view-btn" data-fdd-view-id="${issue.id}"${doc.loading ? ' disabled' : ''}>${viewLabel}</button>
         <button type="button" class="history-delete-btn fdd-row-remove-btn" data-fdd-remove-id="${issue.id}" title="Remove this file">&times;</button>
       </div>
     `;
   }
 
-  function renderFddPreview(f) {
-    const canPreviewInline = f.type === 'application/pdf';
+  function renderFddPreview(doc) {
+    const canPreviewInline = doc.contentType === 'application/pdf';
     return canPreviewInline
-      ? `<iframe src="${f.blobUrl}" class="fdd-preview-frame" title="FDD preview"></iframe>`
-      : `<div class="empty">Preview isn't available for this file type in-browser. <a href="${f.blobUrl}" download="${f.name}">Download ${f.name}</a> to view it.</div>`;
+      ? `<iframe src="${doc.blobUrl}" class="fdd-preview-frame" title="FDD preview"></iframe>`
+      : `<div class="empty">Preview isn't available for this file type in-browser. <a href="${doc.blobUrl}" download="${doc.filename}">Download ${doc.filename}</a> to view it.</div>`;
   }
 
-  function renderFddView(list) {
+  // Redraws just the FDD tab's body content and (re)wires its controls —
+  // called both after the initial server load and after any local action
+  // (upload/view/remove), without needing to hit the network again except
+  // where the action itself requires it (see the handlers below).
+  function renderFddBody(list) {
+    const body = document.getElementById('body');
     const fddItems = list.filter(isFddItem);
-    return `
+    body.innerHTML = `
       <div class="history-wrap">
         <div class="history-header">FDD Tracker <span class="count">(${fddItems.length} item${fddItems.length === 1 ? '' : 's'})</span></div>
-        <p class="history-hint">Items are matched automatically when "FDD" appears in the title, target date, or notes/description — including an FDD ID like "FDD 17676". Upload each item's FDD document in its own row to preview it here; files stay local to your browser only and aren't saved to the shared tracker.</p>
+        <p class="history-hint">Items are matched automatically when "FDD" appears in the title, target date, or notes/description — including an FDD ID like "FDD 17676". Upload each item's FDD document in its own row — files are saved to the shared tracker (up to ~8 MB each) so everyone sees the same document.</p>
         ${renderFddItemsList(fddItems)}
       </div>
     `;
+
+    body.querySelectorAll('[data-id]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        if (e.target.closest('.fdd-row-controls')) return;
+        openModal(el.getAttribute('data-id'));
+      });
+    });
+
+    body.querySelectorAll('.fdd-row-upload-input').forEach(input => {
+      input.addEventListener('click', (e) => e.stopPropagation());
+      input.addEventListener('change', async () => {
+        const file = input.files[0];
+        if (!file) return;
+        const issueId = input.getAttribute('data-fdd-issue-id');
+        if (file.size > MAX_FDD_FILE_BYTES) {
+          showAlertModal(`That file is too large to store (limit is roughly ${Math.round(MAX_FDD_FILE_BYTES / (1024 * 1024))} MB). Try a smaller file.`);
+          input.value = '';
+          return;
+        }
+        fddDocs[issueId] = { uploading: true };
+        renderFddBody(getFiltered());
+        try {
+          const base64 = await readFileAsBase64(file);
+          const res = await fetch('/api/fdd/' + encodeURIComponent(issueId), {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename: file.name, contentType: file.type, size: file.size, data: base64 }),
+          });
+          if (!res.ok) throw new Error('Upload failed: ' + res.status);
+          const payload = await res.json();
+          fddDocs[issueId] = {
+            filename: file.name,
+            contentType: file.type,
+            size: file.size,
+            uploadedAt: payload.uploadedAt || new Date().toISOString(),
+            blobUrl: URL.createObjectURL(file),
+            loaded: true,
+          };
+          expandedFddId = issueId;
+        } catch (e) {
+          console.error('FDD upload failed', e);
+          delete fddDocs[issueId];
+          showAlertModal('Could not upload that file — please try again.');
+        }
+        renderFddBody(getFiltered());
+      });
+    });
+
+    body.querySelectorAll('.fdd-row-view-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const issueId = btn.getAttribute('data-fdd-view-id');
+        if (expandedFddId === issueId) {
+          expandedFddId = null;
+          renderFddBody(getFiltered());
+          return;
+        }
+        const doc = fddDocs[issueId];
+        if (doc && !doc.loaded && !doc.loading) {
+          doc.loading = true;
+          renderFddBody(getFiltered());
+          try {
+            const res = await fetch('/api/fdd/' + encodeURIComponent(issueId));
+            if (!res.ok) throw new Error('Failed to load: ' + res.status);
+            const payload = await res.json();
+            doc.blobUrl = base64ToBlobUrl(payload.data, payload.contentType);
+            doc.loaded = true;
+          } catch (err) {
+            console.error('FDD load failed', err);
+            doc.loading = false;
+            renderFddBody(getFiltered());
+            showAlertModal('Could not load that FDD file — please try again.');
+            return;
+          }
+          doc.loading = false;
+        }
+        expandedFddId = issueId;
+        renderFddBody(getFiltered());
+      });
+    });
+
+    body.querySelectorAll('.fdd-row-remove-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const issueId = btn.getAttribute('data-fdd-remove-id');
+        showConfirmModal(
+          'Remove this FDD file? This deletes it from the shared tracker for everyone.',
+          async () => {
+            try {
+              await fetch('/api/fdd/' + encodeURIComponent(issueId), { method: 'DELETE' });
+            } catch (err) {
+              console.error('FDD delete failed', err);
+            }
+            const existing = fddDocs[issueId];
+            if (existing && existing.blobUrl) URL.revokeObjectURL(existing.blobUrl);
+            delete fddDocs[issueId];
+            if (expandedFddId === issueId) expandedFddId = null;
+            renderFddBody(getFiltered());
+          },
+          'Remove'
+        );
+      });
+    });
+  }
+
+  // Entry point for the FDD tab — fetches the current file metadata from
+  // the server (so a page refresh, or another person's upload, shows up
+  // correctly) and merges it into the local cache without clobbering a
+  // blobUrl already fetched/created earlier in this same session.
+  async function loadAndRenderFddView(list) {
+    let files;
+    try {
+      const res = await fetch('/api/fdd');
+      if (!res.ok) throw new Error('Failed to load: ' + res.status);
+      const payload = await res.json();
+      files = payload.files || [];
+    } catch (e) {
+      if (currentView === 'fdd') {
+        document.getElementById('body').innerHTML = '<div class="empty">Could not load FDD documents.</div>';
+      }
+      return;
+    }
+    if (currentView !== 'fdd') return;
+
+    const serverIds = new Set(files.map(f => f.issueId));
+    files.forEach(f => {
+      const existing = fddDocs[f.issueId];
+      fddDocs[f.issueId] = {
+        filename: f.filename,
+        contentType: f.contentType,
+        size: f.size,
+        uploadedAt: f.uploadedAt,
+        loaded: existing ? existing.loaded : false,
+        blobUrl: existing ? existing.blobUrl : undefined,
+      };
+    });
+    // Drop cached entries for files removed server-side (e.g. by someone
+    // else, or in another tab).
+    Object.keys(fddDocs).forEach(id => {
+      if (!serverIds.has(id)) {
+        if (fddDocs[id] && fddDocs[id].blobUrl) URL.revokeObjectURL(fddDocs[id].blobUrl);
+        delete fddDocs[id];
+      }
+    });
+
+    renderFddBody(list);
   }
 
   // ---------- History (upload snapshots) ----------
@@ -1888,7 +2080,10 @@
     else if (currentView === 'table') body.innerHTML = renderTable(list);
     else if (currentView === 'calendar') body.innerHTML = renderCalendar(list);
     else if (currentView === 'closed') body.innerHTML = renderClosedList(list);
-    else if (currentView === 'fdd') body.innerHTML = renderFddView(list);
+    else if (currentView === 'fdd') {
+      body.innerHTML = '<div class="empty">Loading FDD documents&hellip;</div>';
+      loadAndRenderFddView(list);
+    }
     else if (currentView === 'history') {
       body.innerHTML = '<div class="empty">Loading history&hellip;</div>';
       loadAndRenderHistory();
@@ -1921,41 +2116,6 @@
       body.querySelectorAll('.cal-cell.has-due').forEach(cell => {
         cell.addEventListener('click', () => {
           selectedCalendarDate = cell.getAttribute('data-cal-date');
-          render();
-        });
-      });
-    }
-
-    if (currentView === 'fdd') {
-      body.querySelectorAll('.fdd-row-upload-input').forEach(input => {
-        input.addEventListener('click', (e) => e.stopPropagation());
-        input.addEventListener('change', () => {
-          const file = input.files[0];
-          if (!file) return;
-          const issueId = input.getAttribute('data-fdd-issue-id');
-          const existing = fddReviewFiles[issueId];
-          if (existing && existing.blobUrl) URL.revokeObjectURL(existing.blobUrl);
-          fddReviewFiles[issueId] = { name: file.name, size: file.size, type: file.type, blobUrl: URL.createObjectURL(file) };
-          expandedFddId = issueId; // open the preview immediately after upload
-          render();
-        });
-      });
-      body.querySelectorAll('.fdd-row-view-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const issueId = btn.getAttribute('data-fdd-view-id');
-          expandedFddId = expandedFddId === issueId ? null : issueId;
-          render();
-        });
-      });
-      body.querySelectorAll('.fdd-row-remove-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const issueId = btn.getAttribute('data-fdd-remove-id');
-          const existing = fddReviewFiles[issueId];
-          if (existing && existing.blobUrl) URL.revokeObjectURL(existing.blobUrl);
-          delete fddReviewFiles[issueId];
-          if (expandedFddId === issueId) expandedFddId = null;
           render();
         });
       });
