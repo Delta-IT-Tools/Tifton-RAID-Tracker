@@ -424,7 +424,7 @@
     border-radius: 4px;
     white-space: nowrap;
   }
-  #tifton-tracker .card-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  #tifton-tracker .card-tag-slot { display: flex; }
   #tifton-tracker .late-tag {
     font-size: 10px;
     font-weight: 700;
@@ -999,9 +999,13 @@
     const counts = {};
     STATUS_ORDER.forEach(s => { counts[s] = 0; });
     issues.forEach(i => { counts[i.status] = (counts[i.status]||0) + 1; });
-    const blockerCount = issues.filter(i => isBlocker(i.blocker)).length;
+    // Both the Late and Walmart Blocker header tiles intentionally only
+    // count items in an active Board status (Open, In Progress, Testing,
+    // Ready for Customer, Ready for Install) — a Closed/On Hold/Monitoring
+    // item doesn't need to be flagged as late or as a blocker anymore.
+    const blockerCount = issues.filter(i => isBlocker(i.blocker) && BOARD_STATUS_ORDER.includes(i.status)).length;
     const blockerActive = document.getElementById('filter-blocker').value === 'Y';
-    const lateCount = issues.filter(isLate).length;
+    const lateCount = issues.filter(i => isLate(i) && BOARD_STATUS_ORDER.includes(i.status)).length;
     const row = document.getElementById('stat-row');
     // Mirrors the Board view's 5 columns for a clean, consistent header —
     // Monitoring/On Hold/Closed items are still fully counted and
@@ -1088,10 +1092,8 @@
     return `
       <div class="card ${issue.status}${late ? ' is-late' : ''}" data-id="${issue.id}">
         <div class="card-top">
-          <div class="card-tags">
-            ${isBlocker(issue.blocker) ? `<span class="blocker-tag">Walmart blocker${issue.blocker === 'Y/N' ? ' (Y/N)' : ''}</span>` : ''}
-            ${late ? `<span class="late-tag">LATE</span>` : ''}
-          </div>
+          <div class="card-tag-slot card-tag-left">${late ? `<span class="late-tag">LATE</span>` : ''}</div>
+          <div class="card-tag-slot card-tag-right">${isBlocker(issue.blocker) ? `<span class="blocker-tag">Walmart blocker${issue.blocker === 'Y/N' ? ' (Y/N)' : ''}</span>` : ''}</div>
         </div>
         <div class="card-title">${issue.title}</div>
         <div class="meta-row">
