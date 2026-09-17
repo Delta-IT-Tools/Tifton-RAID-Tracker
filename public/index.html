@@ -647,6 +647,38 @@
   #tifton-tracker .closed-header .count { font-weight: 400; color: rgba(243,241,234,0.75); }
 
 
+  /* FDD view */
+  #tifton-tracker .fdd-upload {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  #tifton-tracker .fdd-upload-label {
+    display: block;
+    font-size: 11.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ink-soft);
+    margin-bottom: 6px;
+  }
+  #tifton-tracker .fdd-upload-file-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    font-size: 13.5px;
+  }
+  #tifton-tracker .fdd-preview-frame {
+    width: 100%;
+    height: 60vh;
+    min-height: 360px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: white;
+  }
+
   /* History view */
   #tifton-tracker .history-wrap {
     background: var(--panel);
@@ -841,6 +873,7 @@
       <div class="view-toggle" id="view-toggle">
         <button data-view="analysis">Analysis</button>
         <button data-view="board" class="active">Board</button>
+        <button data-view="fdd">FDD</button>
         <button data-view="history">History</button>
         <button data-view="calendar">Calendar</button>
         <button data-view="table">Table</button>
@@ -889,6 +922,10 @@
   })();
   let selectedCalendarDate = null;
   let editingId = null;
+  // Locally-selected file for the FDD "upload for review" section — kept
+  // in memory only (not sent to the server/D1), so it previews in this
+  // browser tab until cleared or the page is refreshed.
+  let fddReviewFile = null;
   let activeBoardEl = null;
 
   async function loadIssues() {
@@ -1250,6 +1287,101 @@
             `).join('')}
           </tbody>
         </table>
+      </div>
+    `;
+  }
+
+  // ---------- FDD (Functional Design Document) tracker ----------
+  //
+  // An item is "FDD-related" if the word "FDD" shows up anywhere relevant
+  // to it — the title, the target date field (which sometimes holds a
+  // placeholder like "FDD to be created" instead of a real date), or the
+  // detail/notes text. That single check also naturally covers an FDD ID
+  // like "FDD 17676" appearing anywhere in that text.
+  function fddSearchText(issue) {
+    return [issue.title, issue.detail, issue.notes, issue.targetDate].filter(Boolean).join(' ');
+  }
+
+  function isFddItem(issue) {
+    return /FDD/i.test(fddSearchText(issue));
+  }
+
+  // Pulls the first FDD number found (e.g. "FDD 17676", "FDD#17676",
+  // "FDD-17676") out of the item's text. Returns null if none is found,
+  // so the caller can show "FDD# REQUIRED" instead.
+  function extractFddNumber(issue) {
+    const m = fddSearchText(issue).match(/FDD\s*#?\s*-?\s*(\d{3,6})/i);
+    return m ? m[1] : null;
+  }
+
+  function renderFddItemsList(fddItems) {
+    if (!fddItems.length) {
+      return '<div class="empty">No FDD-related items match the current filters. An item is picked up here when "FDD" appears in its title, target date, or notes/description — including an FDD ID like "FDD 17676".</div>';
+    }
+    const sorted = fddItems.slice().sort((a, b) => {
+      const statusDiff = STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status);
+      return statusDiff !== 0 ? statusDiff : a.title.localeCompare(b.title);
+    });
+    return `
+      <table>
+        <thead><tr><th>Issue</th><th>FDD #</th><th>Status</th><th>Target</th><th>Owner</th></tr></thead>
+        <tbody>
+          ${sorted.map(i => {
+            const fddNum = extractFddNumber(i);
+            return `
+              <tr data-id="${i.id}">
+                <td>
+                  <strong>${i.title}</strong><br><span style="color:var(--ink-soft);font-size:12px;">${i.detail}</span>
+                </td>
+                <td>${fddNum ? `FDD ${fddNum}` : '<span class="status-pill unmatched">FDD# REQUIRED</span>'}</td>
+                <td><span class="status-pill ${i.status}">${STATUS_LABELS[i.status]}</span></td>
+                <td>${i.targetDate ? formatDate(i.targetDate) : '—'}</td>
+                <td>${i.owner || '—'}</td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    `;
+  }
+
+  function renderFddUploadSection() {
+    if (!fddReviewFile) {
+      return `
+        <div class="fdd-upload">
+          <label class="fdd-upload-label" for="fdd-upload-input">Upload FDD for review</label>
+          <input type="file" id="fdd-upload-input" accept=".pdf,.doc,.docx">
+          <p class="history-hint">Select a Functional Design Document (PDF or Word) to preview here. This stays local to your browser only — it isn't saved to the shared tracker, and clearing/refreshing the page removes it.</p>
+        </div>
+      `;
+    }
+    const f = fddReviewFile;
+    const sizeLabel = f.size > 1024 * 1024 ? (f.size / (1024 * 1024)).toFixed(1) + ' MB' : Math.max(1, Math.round(f.size / 1024)) + ' KB';
+    const canPreviewInline = f.type === 'application/pdf';
+    const previewHtml = canPreviewInline
+      ? `<iframe src="${f.blobUrl}" class="fdd-preview-frame" title="FDD preview"></iframe>`
+      : `<div class="empty">Preview isn't available for this file type in-browser. <a href="${f.blobUrl}" download="${f.name}">Download ${f.name}</a> to view it.</div>`;
+    return `
+      <div class="fdd-upload">
+        <div class="fdd-upload-file-row">
+          <div><strong>${f.name}</strong><span class="history-hint" style="margin:0 0 0 8px;display:inline;">(${sizeLabel})</span></div>
+          <button type="button" class="btn-secondary" id="fdd-upload-clear">Remove</button>
+        </div>
+        ${previewHtml}
+      </div>
+    `;
+  }
+
+  function renderFddView(list) {
+    const fddItems = list.filter(isFddItem);
+    return `
+      <div class="history-wrap">
+        <div class="history-header">FDD Tracker <span class="count">(${fddItems.length} item${fddItems.length === 1 ? '' : 's'})</span></div>
+        <p class="history-hint">Items are matched automatically when "FDD" appears in the title, target date, or notes/description — including an FDD ID like "FDD 17676".</p>
+        ${renderFddUploadSection()}
+        <div style="margin-top:18px;">
+          ${renderFddItemsList(fddItems)}
+        </div>
       </div>
     `;
   }
@@ -1728,6 +1860,7 @@
     else if (currentView === 'table') body.innerHTML = renderTable(list);
     else if (currentView === 'calendar') body.innerHTML = renderCalendar(list);
     else if (currentView === 'closed') body.innerHTML = renderClosedList(list);
+    else if (currentView === 'fdd') body.innerHTML = renderFddView(list);
     else if (currentView === 'history') {
       body.innerHTML = '<div class="empty">Loading history&hellip;</div>';
       loadAndRenderHistory();
@@ -1760,6 +1893,27 @@
           render();
         });
       });
+    }
+
+    if (currentView === 'fdd') {
+      const fddInput = document.getElementById('fdd-upload-input');
+      if (fddInput) {
+        fddInput.addEventListener('change', () => {
+          const file = fddInput.files[0];
+          if (!file) return;
+          if (fddReviewFile && fddReviewFile.blobUrl) URL.revokeObjectURL(fddReviewFile.blobUrl);
+          fddReviewFile = { name: file.name, size: file.size, type: file.type, blobUrl: URL.createObjectURL(file) };
+          render();
+        });
+      }
+      const fddClearBtn = document.getElementById('fdd-upload-clear');
+      if (fddClearBtn) {
+        fddClearBtn.addEventListener('click', () => {
+          if (fddReviewFile && fddReviewFile.blobUrl) URL.revokeObjectURL(fddReviewFile.blobUrl);
+          fddReviewFile = null;
+          render();
+        });
+      }
     }
 
     syncBoardScrollbar();
