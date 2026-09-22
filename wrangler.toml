@@ -2,6 +2,14 @@ name = "tifton-raid-tracker"
 main = "src/index.js"
 compatibility_date = "2026-09-08"
 
+# Tells Wrangler to leave dashboard-configured vars/secrets alone on every
+# deploy, instead of wiping them. Without this, SITE_PASSWORD and
+# SESSION_SECRET (set via the dashboard, see below) get cleared on every
+# push through the GitHub -> Workers Builds pipeline — a known Cloudflare
+# behavior (workers-sdk issue #8871), not something specific to this repo.
+# This must be a top-level key (not inside any [env.x] block).
+keep_vars = true
+
 # Serves public/index.html and any other static files in that folder.
 # The "ASSETS" name here matches env.ASSETS used in src/index.js.
 #
@@ -26,10 +34,12 @@ database_id = "32d6b303-e8ed-477d-8b40-43b485d9a337"
 
 # SITE_PASSWORD and SESSION_SECRET are intentionally NOT declared here.
 #
-# Set them instead via the Cloudflare dashboard: this Worker -> Settings
-# -> Variables and Secrets -> Add -> toggle "Encrypt". Once set this way,
-# they persist automatically across every future deployment — Cloudflare
-# will not remove them on its own.
+# Set them via the Cloudflare dashboard: this Worker -> Settings ->
+# Variables and Secrets -> Add -> toggle "Encrypt". With keep_vars = true
+# above, they'll persist across every future deployment instead of being
+# cleared on each push — that clearing was a real bug in how Cloudflare's
+# GitHub integration handles dashboard secrets by default, not expected
+# behavior, and this setting is the documented fix for it.
 #
 # Putting the actual secret VALUES in this file would also mean committing
 # your password and signing key to git — exactly what secrets are meant to
