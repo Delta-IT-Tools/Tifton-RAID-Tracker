@@ -503,9 +503,9 @@
     font-size: 11.5px;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: #f3f1ea;
+    color: var(--ink);
     padding: 8px 10px;
-    border-bottom: 2px solid rgba(243,241,234,0.55);
+    border-bottom: 2px solid var(--ink);
   }
   #tifton-tracker tbody tr { background: rgba(255,255,255,0.9); }
   #tifton-tracker tbody td { padding: 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
@@ -1200,30 +1200,40 @@
       const statusDiff = STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status);
       return statusDiff !== 0 ? statusDiff : a.title.localeCompare(b.title);
     });
-    if (!sorted.length) return '<div class="empty">No issues match these filters</div>';
+    if (!sorted.length) {
+      return `
+        <div class="closed-wrap">
+          <div class="closed-header">RAID Log Tabular View</div>
+          <div class="empty">No issues match these filters</div>
+        </div>
+      `;
+    }
     return `
-      <table>
-        <thead><tr><th>Issue</th><th>DevOps #</th><th>Priority</th><th>Walmart Blocker</th><th>Reported</th><th>Target</th><th>Owner</th><th>Status</th></tr></thead>
-        <tbody>
-          ${sorted.map(i => `
-            <tr data-id="${i.id}">
-              <td>
-                <strong>${i.title}</strong><br><span style="color:var(--ink-soft);font-size:12px;">${i.detail}</span>
-                ${i.notes ? `<br><span style="color:var(--steel-dark);font-size:11.5px;font-style:italic;"><strong>Notes:</strong> ${i.notes}</span>` : ''}
-              </td>
-              <td>${i.devops || '—'}</td>
-              <td>${i.priority || '—'}</td>
-              <td>${isBlocker(i.blocker) ? `<span class="blocker-tag">${i.blocker}</span>` : (i.blocker || '—')}</td>
-              <td>${i.reportedDate ? formatDate(i.reportedDate) : '—'}</td>
-              <td>${i.targetDate ? formatDate(i.targetDate) : '—'}</td>
-              <td>${i.owner || '—'}</td>
-              <td>
-                <span class="status-pill ${i.status}">${STATUS_LABELS[i.status]}</span>
-              </td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
+      <div class="closed-wrap">
+        <div class="closed-header">RAID Log Tabular View <span class="count">(${sorted.length})</span></div>
+        <table>
+          <thead><tr><th>Issue</th><th>DevOps #</th><th>Priority</th><th>Walmart Blocker</th><th>Reported</th><th>Target</th><th>Owner</th><th>Status</th></tr></thead>
+          <tbody>
+            ${sorted.map(i => `
+              <tr data-id="${i.id}">
+                <td>
+                  <strong>${i.title}</strong><br><span style="color:var(--ink-soft);font-size:12px;">${i.detail}</span>
+                  ${i.notes ? `<br><span style="color:var(--steel-dark);font-size:11.5px;font-style:italic;"><strong>Notes:</strong> ${i.notes}</span>` : ''}
+                </td>
+                <td>${i.devops || '—'}</td>
+                <td>${i.priority || '—'}</td>
+                <td>${isBlocker(i.blocker) ? `<span class="blocker-tag">${i.blocker}</span>` : (i.blocker || '—')}</td>
+                <td>${i.reportedDate ? formatDate(i.reportedDate) : '—'}</td>
+                <td>${i.targetDate ? formatDate(i.targetDate) : '—'}</td>
+                <td>${i.owner || '—'}</td>
+                <td>
+                  <span class="status-pill ${i.status}">${STATUS_LABELS[i.status]}</span>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
     `;
   }
 
@@ -2073,10 +2083,8 @@
       return d ? d.issues.filter(i => isBlocker(i.blocker)).length : 0;
     });
 
-    // 5. Closure velocity — how many items newly became Closed between
-    // each consecutive pair of uploads. New Items per upload is computed
-    // in the same pass since both come from the same diff.
-    const closuresPerInterval = [];
+    // 5. New Items per upload, computed from the same interval-by-interval
+    // diff used for date-change tracking below.
     const newItemsPerInterval = [];
     let totalDateSlips = 0;
     let totalDatePullIns = 0;
@@ -2085,9 +2093,8 @@
     for (let i = 1; i < chrono.length; i++) {
       const prevDetail = detailById[chrono[i - 1].id];
       const curDetail = detailById[chrono[i].id];
-      if (!prevDetail || !curDetail) { closuresPerInterval.push(0); newItemsPerInterval.push(0); continue; }
+      if (!prevDetail || !curDetail) { newItemsPerInterval.push(0); continue; }
       const diff = diffSnapshotItems(prevDetail.issues, curDetail.issues);
-      closuresPerInterval.push(diff.statusChanged.filter(c => c.to === 'closed').length);
       newItemsPerInterval.push(diff.added.length);
       diff.dateChanged.forEach(c => {
         const direction = dateChangeDirection(c.from, c.to);
@@ -2099,14 +2106,16 @@
     // Most recent change first within each list.
     dateSlipItems.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
     datePullInItems.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
-    const totalClosures = closuresPerInterval.reduce((a, b) => a + b, 0);
-    const avgClosures = closuresPerInterval.length ? totalClosures / closuresPerInterval.length : 0;
-    const currentOpenCount = issues.filter(i => i.status !== 'closed').length;
-    const projectedUploads = avgClosures > 0 ? Math.ceil(currentOpenCount / avgClosures) : null;
     // New Items chart x-axis: one bar per interval, labeled with the date
     // of the NEWER upload in that pair (the upload where those items
     // first showed up) — so it lines up with chrono.slice(1).
     const newItemsXLabels = xLabels.slice(1);
+
+    // Closures over time — the running Closed count at each upload
+    // (items don't reopen in this tracker, so this doubles as a
+    // cumulative closures-to-date line). Reuses the same per-snapshot
+    // statusCounts already used for the Status Trends chart.
+    const closuresOverTimePoints = chrono.map(s => (s.statusCounts && s.statusCounts.closed) || 0);
 
     // 2. Stuck items — for each currently-open issue, walk backward
     // through uploads (newest to oldest) and count how many consecutive
@@ -2133,14 +2142,10 @@
       .filter(s => s.streak >= 2)
       .sort((a, b) => b.streak - a.streak);
 
-    const closureHtml = `
+    const closuresOverTimeHtml = `
       <div class="analysis-card">
-        <div class="analysis-card-title">Closure Velocity</div>
-        <div class="analysis-stat-row">
-          <div class="analysis-stat"><div class="analysis-stat-n">${avgClosures.toFixed(1)}</div><div class="analysis-stat-l">Avg. closures per upload</div></div>
-          <div class="analysis-stat"><div class="analysis-stat-n">${totalClosures}</div><div class="analysis-stat-l">Total closed across all uploads</div></div>
-          <div class="analysis-stat"><div class="analysis-stat-n">${projectedUploads !== null ? '~' + projectedUploads : '&mdash;'}</div><div class="analysis-stat-l">Projected uploads to clear ${currentOpenCount} current Open item(s)</div></div>
-        </div>
+        <div class="analysis-card-title">Closures Over Time</div>
+        ${renderLineChartSVG([{ name: 'Closed', color: '#1f7a72', points: closuresOverTimePoints }], xLabels)}
       </div>
     `;
 
@@ -2230,8 +2235,8 @@
             ${renderLineChartSVG([{ name: 'Walmart Blockers', color: '#a3402f', points: blockerPoints }], xLabels)}
           </div>
           ${newItemsHtml}
+          ${closuresOverTimeHtml}
         </div>
-        ${closureHtml}
         ${dueDateHtml}
         ${stuckHtml}
       </div>
