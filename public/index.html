@@ -2080,6 +2080,8 @@
     const newItemsPerInterval = [];
     let totalDateSlips = 0;
     let totalDatePullIns = 0;
+    const dateSlipItems = [];
+    const datePullInItems = [];
     for (let i = 1; i < chrono.length; i++) {
       const prevDetail = detailById[chrono[i - 1].id];
       const curDetail = detailById[chrono[i].id];
@@ -2089,10 +2091,14 @@
       newItemsPerInterval.push(diff.added.length);
       diff.dateChanged.forEach(c => {
         const direction = dateChangeDirection(c.from, c.to);
-        if (direction === 'slip') totalDateSlips++;
-        else if (direction === 'pullin') totalDatePullIns++;
+        const record = { title: c.item.title, id: c.item.id, from: c.from, to: c.to, uploadedAt: chrono[i].uploadedAt };
+        if (direction === 'slip') { totalDateSlips++; dateSlipItems.push(record); }
+        else if (direction === 'pullin') { totalDatePullIns++; datePullInItems.push(record); }
       });
     }
+    // Most recent change first within each list.
+    dateSlipItems.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
+    datePullInItems.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
     const totalClosures = closuresPerInterval.reduce((a, b) => a + b, 0);
     const avgClosures = closuresPerInterval.length ? totalClosures / closuresPerInterval.length : 0;
     const currentOpenCount = issues.filter(i => i.status !== 'closed').length;
@@ -2138,6 +2144,15 @@
       </div>
     `;
 
+    const renderDateChangeRows = (items) => items.map(r => `
+      <tr data-id="${r.id}">
+        <td>${r.title}</td>
+        <td>${formatDate(r.from)}</td>
+        <td>${formatDate(r.to)}</td>
+        <td>${formatDate(r.uploadedAt.slice(0, 10))}</td>
+      </tr>
+    `).join('');
+
     const dueDateHtml = `
       <div class="analysis-card">
         <div class="analysis-card-title">Due Date Changes <span class="count">(across ${chrono.length} uploads)</span></div>
@@ -2145,7 +2160,26 @@
           <div class="analysis-stat"><div class="analysis-stat-n" style="color:var(--rust);">${totalDateSlips}</div><div class="analysis-stat-l">Due dates pushed out</div></div>
           <div class="analysis-stat"><div class="analysis-stat-n" style="color:var(--moss);">${totalDatePullIns}</div><div class="analysis-stat-l">Due dates pulled in</div></div>
         </div>
-        <p class="history-hint" style="margin-top:10px;margin-bottom:0;">Counted whenever an item's target date changed between two consecutive uploads and both dates were real (not "TBD" or similar). See the History tab for exactly which items and when.</p>
+        <p class="history-hint" style="margin-top:10px;">Counted whenever an item's target date changed between two consecutive uploads and both dates were real (not "TBD" or similar). Click a row to open that item.</p>
+        ${dateSlipItems.length ? `
+          <div style="margin-top:4px;">
+            <div class="history-diff-title" style="color:var(--rust);">Pushed Out (${dateSlipItems.length})</div>
+            <table class="stuck-table">
+              <thead><tr><th>Issue</th><th>Was</th><th>Now</th><th>Seen in upload</th></tr></thead>
+              <tbody>${renderDateChangeRows(dateSlipItems)}</tbody>
+            </table>
+          </div>
+        ` : ''}
+        ${datePullInItems.length ? `
+          <div style="margin-top:${dateSlipItems.length ? '18px' : '4px'};">
+            <div class="history-diff-title" style="color:var(--moss);">Pulled In (${datePullInItems.length})</div>
+            <table class="stuck-table">
+              <thead><tr><th>Issue</th><th>Was</th><th>Now</th><th>Seen in upload</th></tr></thead>
+              <tbody>${renderDateChangeRows(datePullInItems)}</tbody>
+            </table>
+          </div>
+        ` : ''}
+        ${!dateSlipItems.length && !datePullInItems.length ? `<div class="empty">No due date changes detected yet between consecutive uploads.</div>` : ''}
       </div>
     `;
 
