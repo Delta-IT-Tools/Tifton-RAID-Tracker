@@ -1628,11 +1628,21 @@
     const added = [];
     const removed = [];
     const statusChanged = [];
+    const dateChanged = [];
     newerMap.forEach((item, id) => {
       if (!olderMap.has(id)) {
         added.push(item);
-      } else if (olderMap.get(id).status !== item.status) {
-        statusChanged.push({ item, from: olderMap.get(id).status, to: item.status });
+        return;
+      }
+      const older = olderMap.get(id);
+      if (older.status !== item.status) {
+        statusChanged.push({ item, from: older.status, to: item.status });
+      }
+      // Target date is tracked independently of status — an item can sit
+      // in the same status across uploads while its due date quietly
+      // moves, and that's exactly the case this is meant to catch.
+      if ((older.targetDate || '') !== (item.targetDate || '')) {
+        dateChanged.push({ item, from: older.targetDate, to: item.targetDate });
       }
     });
     olderMap.forEach((item, id) => {
@@ -1645,7 +1655,24 @@
     // (Open, In Progress, Testing, Ready for Customer, Ready for Install) —
     // Monitoring/On Hold/Closed items aren't worth calling out here.
     const unmatched = newer.filter(i => !isTrackableId(i.id) && BOARD_STATUS_ORDER.includes(i.status));
-    return { added, removed, statusChanged, unmatched };
+    return { added, removed, statusChanged, dateChanged, unmatched };
+  }
+
+  // A due-date change only counts as a "slip" or "pull-in" when both the
+  // old and new values are real ISO dates — comparing "TBD" to "TBD" or
+  // to a real date isn't a meaningful direction, just a text change.
+  function dateChangeDirection(fromDate, toDate) {
+    const fromValid = /^\d{4}-\d{2}-\d{2}$/.test(fromDate || '');
+    const toValid = /^\d{4}-\d{2}-\d{2}$/.test(toDate || '');
+    if (!fromValid || !toValid) return null;
+    if (toDate > fromDate) return 'slip';
+    if (toDate < fromDate) return 'pullin';
+    return null;
+  }
+
+  function dateChangeLabel(iso) {
+    if (!iso) return 'No due date';
+    return formatDate(iso);
   }
 
   async function loadAndRenderHistory() {
@@ -1803,8 +1830,9 @@
   }
 
   function renderHistoryDiff(diff, fromDate, toDate) {
-    const { added, removed, statusChanged, unmatched } = diff;
-    if (!added.length && !removed.length && !statusChanged.length && !(unmatched && unmatched.length)) {
+    const { added, removed, statusChanged, dateChanged, unmatched } = diff;
+    const dc = dateChanged || [];
+    if (!added.length && !removed.length && !statusChanged.length && !dc.length && !(unmatched && unmatched.length)) {
       return `<div class="history-diff-section"><div class="history-diff-title">Since ${formatDateTime(fromDate)}</div><div class="history-diff-summary">No changes between these two uploads.</div></div>`;
     }
     const changeRows = statusChanged.map(c => `
@@ -1815,14 +1843,28 @@
         <span class="history-diff-item-title">${c.item.title}</span>
       </div>
     `).join('');
+    const dateRows = dc.map(c => {
+      const direction = dateChangeDirection(c.from, c.to);
+      const toClass = direction === 'slip' ? 'target-tag target-tag-late' : 'target-tag';
+      const directionLabel = direction === 'slip' ? ' <span style="color:var(--rust);font-weight:600;">(pushed out)</span>' : direction === 'pullin' ? ' <span style="color:var(--moss);font-weight:600;">(pulled in)</span>' : '';
+      return `
+      <div class="history-diff-item">
+        <span class="target-tag">${dateChangeLabel(c.from)}</span>
+        <span class="history-diff-arrow">&rarr;</span>
+        <span class="${toClass}">${dateChangeLabel(c.to)}</span>
+        <span class="history-diff-item-title">${c.item.title}${directionLabel}</span>
+      </div>
+    `;
+    }).join('');
     const addedRows = added.map(i => `<div class="history-diff-item"><span class="status-pill ${i.status}">New</span><span class="history-diff-item-title">${i.title}</span></div>`).join('');
     const removedRows = removed.map(i => `<div class="history-diff-item"><span class="status-pill closed">Removed</span><span class="history-diff-item-title">${i.title}</span></div>`).join('');
     const unmatchedRows = (unmatched || []).map(i => `<div class="history-diff-item"><span class="status-pill unmatched">No DevOps #</span><span class="history-diff-item-title">${i.title}</span></div>`).join('');
     return `
       <div class="history-diff-section">
         <div class="history-diff-title">Since ${formatDateTime(fromDate)}</div>
-        <div class="history-diff-summary">${added.length} new &middot; ${removed.length} removed &middot; ${statusChanged.length} changed status${unmatched && unmatched.length ? ` &middot; ${unmatched.length} unmatched (no DevOps #)` : ''}</div>
+        <div class="history-diff-summary">${added.length} new &middot; ${removed.length} removed &middot; ${statusChanged.length} changed status${dc.length ? ` &middot; ${dc.length} due date change${dc.length === 1 ? '' : 's'}` : ''}${unmatched && unmatched.length ? ` &middot; ${unmatched.length} unmatched (no DevOps #)` : ''}</div>
         ${statusChanged.length ? `<div class="history-diff-list">${changeRows}</div>` : ''}
+        ${dc.length ? `<div class="history-diff-list">${dateRows}</div>` : ''}
         ${added.length ? `<div class="history-diff-list">${addedRows}</div>` : ''}
         ${removed.length ? `<div class="history-diff-list">${removedRows}</div>` : ''}
         ${unmatched && unmatched.length ? `<div class="history-diff-list">${unmatchedRows}</div>` : ''}
@@ -2036,6 +2078,8 @@
     // in the same pass since both come from the same diff.
     const closuresPerInterval = [];
     const newItemsPerInterval = [];
+    let totalDateSlips = 0;
+    let totalDatePullIns = 0;
     for (let i = 1; i < chrono.length; i++) {
       const prevDetail = detailById[chrono[i - 1].id];
       const curDetail = detailById[chrono[i].id];
@@ -2043,6 +2087,11 @@
       const diff = diffSnapshotItems(prevDetail.issues, curDetail.issues);
       closuresPerInterval.push(diff.statusChanged.filter(c => c.to === 'closed').length);
       newItemsPerInterval.push(diff.added.length);
+      diff.dateChanged.forEach(c => {
+        const direction = dateChangeDirection(c.from, c.to);
+        if (direction === 'slip') totalDateSlips++;
+        else if (direction === 'pullin') totalDatePullIns++;
+      });
     }
     const totalClosures = closuresPerInterval.reduce((a, b) => a + b, 0);
     const avgClosures = closuresPerInterval.length ? totalClosures / closuresPerInterval.length : 0;
@@ -2086,6 +2135,17 @@
           <div class="analysis-stat"><div class="analysis-stat-n">${totalClosures}</div><div class="analysis-stat-l">Total closed across all uploads</div></div>
           <div class="analysis-stat"><div class="analysis-stat-n">${projectedUploads !== null ? '~' + projectedUploads : '&mdash;'}</div><div class="analysis-stat-l">Projected uploads to clear ${currentOpenCount} current Open item(s)</div></div>
         </div>
+      </div>
+    `;
+
+    const dueDateHtml = `
+      <div class="analysis-card">
+        <div class="analysis-card-title">Due Date Changes <span class="count">(across ${chrono.length} uploads)</span></div>
+        <div class="analysis-stat-row">
+          <div class="analysis-stat"><div class="analysis-stat-n" style="color:var(--rust);">${totalDateSlips}</div><div class="analysis-stat-l">Due dates pushed out</div></div>
+          <div class="analysis-stat"><div class="analysis-stat-n" style="color:var(--moss);">${totalDatePullIns}</div><div class="analysis-stat-l">Due dates pulled in</div></div>
+        </div>
+        <p class="history-hint" style="margin-top:10px;margin-bottom:0;">Counted whenever an item's target date changed between two consecutive uploads and both dates were real (not "TBD" or similar). See the History tab for exactly which items and when.</p>
       </div>
     `;
 
@@ -2138,6 +2198,7 @@
           ${newItemsHtml}
         </div>
         ${closureHtml}
+        ${dueDateHtml}
         ${stuckHtml}
       </div>
     `;
