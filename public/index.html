@@ -66,8 +66,25 @@
     padding: 14px 24px;
     display: flex;
     justify-content: flex-start;
+    align-items: center;
+    gap: 28px;
+    flex-wrap: wrap;
     border-bottom: 1px solid rgba(255,255,255,0.25);
     background: rgba(255,255,255,0.12);
+  }
+  #tifton-tracker .as-of-nav {
+    font-family: 'Oswald', sans-serif;
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: var(--rust);
+  }
+  #tifton-tracker .as-of-nav-empty {
+    color: var(--ink-soft);
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: normal;
+    font-size: 14px;
   }
   #tifton-tracker .eyebrow {
     font-family: 'Oswald', 'Arial Narrow', sans-serif;
@@ -367,23 +384,6 @@
   #tifton-tracker .body { padding: 18px 24px 26px; }
 
   /* Board view */
-  #tifton-tracker .as-of-banner {
-    font-family: 'Oswald', sans-serif;
-    font-size: 15px;
-    font-weight: 700;
-    letter-spacing: 0.03em;
-    color: var(--rust);
-    background: transparent;
-    border: none;
-    padding: 0;
-    margin-bottom: 14px;
-  }
-  #tifton-tracker .as-of-banner-empty {
-    color: var(--ink-soft);
-    font-weight: 600;
-    text-transform: none;
-    letter-spacing: normal;
-  }
   #tifton-tracker .board {
     display: flex;
     gap: 14px;
@@ -927,6 +927,7 @@
       <button data-view="table">Table</button>
       <button data-view="closed">Closed</button>
     </div>
+    <div class="as-of-nav" id="as-of-nav"></div>
   </div>
 
   <div class="toolbar">
@@ -1148,6 +1149,20 @@
     el.textContent = n === 0 ? 'No issues yet' : `${n} tracked issue${n === 1 ? '' : 's'}`;
   }
 
+  // Shown persistently in the nav row (not just on Board) so it's visible
+  // no matter which tab is open.
+  function renderAsOfNav() {
+    const el = document.getElementById('as-of-nav');
+    if (!el) return;
+    if (currentAsOfDate) {
+      el.textContent = `RAID LOG AS OF ${formatDate(currentAsOfDate).toUpperCase()}`;
+      el.classList.remove('as-of-nav-empty');
+    } else {
+      el.textContent = 'No RAID log uploaded yet — use "Upload RAID Log" to get started';
+      el.classList.add('as-of-nav-empty');
+    }
+  }
+
   function renderActiveFilters() {
     const container = document.getElementById('active-filters');
     const status = document.getElementById('filter-status').value;
@@ -1227,9 +1242,6 @@
   }
 
   function renderBoard(list) {
-    const asOfHtml = currentAsOfDate
-      ? `<div class="as-of-banner">RAID LOG AS OF ${formatDate(currentAsOfDate).toUpperCase()}</div>`
-      : `<div class="as-of-banner as-of-banner-empty">No RAID log uploaded yet — use "Upload RAID Log" to get started</div>`;
     const cols = BOARD_STATUS_ORDER.map(st => {
       const items = list.filter(i => i.status === st);
       return `
@@ -1239,7 +1251,7 @@
         </div>
       `;
     }).join('');
-    return `${asOfHtml}<div class="board">${cols}</div>`;
+    return `<div class="board">${cols}</div>`;
   }
 
   function renderTable(list) {
@@ -2276,6 +2288,7 @@
   function render() {
     renderStats();
     renderHeaderSummary();
+    renderAsOfNav();
     renderActiveFilters();
     const list = getFiltered();
     const body = document.getElementById('body');
