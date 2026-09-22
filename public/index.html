@@ -1905,6 +1905,68 @@
     `;
   }
 
+  // A matching hand-rolled SVG bar chart, styled the same as the line
+  // chart above (same grid/axis look), for single-series counts like New
+  // Items per upload.
+  function renderBarChartSVG(values, xLabels, color) {
+    const width = 640, height = 220;
+    const padL = 42, padR = 16, padT = 16, padB = 28;
+    const plotW = width - padL - padR;
+    const plotH = height - padT - padB;
+    const n = xLabels.length;
+
+    let yMax = 0;
+    values.forEach(v => { if (v > yMax) yMax = v; });
+    const rawStep = Math.max(1, yMax * 1.15) / 4;
+    const mag = Math.pow(10, Math.floor(Math.log10(rawStep || 1)));
+    const step = Math.max(1, Math.ceil(rawStep / mag) * mag);
+    yMax = step * 4;
+
+    const yAt = (v) => padT + plotH - (plotH * v) / yMax;
+
+    let gridLines = '';
+    for (let g = 0; g <= 4; g++) {
+      const v = step * g;
+      const y = yAt(v);
+      gridLines += `<line x1="${padL}" y1="${y}" x2="${width - padR}" y2="${y}" stroke="#dcd8cc" stroke-width="1"/>`;
+      gridLines += `<text x="${padL - 8}" y="${y + 4}" font-size="11" fill="#565f6c" text-anchor="end">${Math.round(v)}</text>`;
+    }
+
+    const slotW = n > 0 ? plotW / n : plotW;
+    const barW = Math.max(4, slotW * 0.55);
+
+    let bars = '';
+    values.forEach((v, i) => {
+      const x = padL + slotW * i + (slotW - barW) / 2;
+      const y = yAt(v);
+      const h = (padT + plotH) - y;
+      bars += `<rect x="${x}" y="${y}" width="${barW}" height="${Math.max(0, h)}" fill="${color}" rx="2"/>`;
+      if (h > 14) {
+        bars += `<text x="${x + barW / 2}" y="${y - 5}" font-size="10.5" fill="#565f6c" text-anchor="middle">${v}</text>`;
+      }
+    });
+
+    let xTicks = '';
+    const tickEvery = n > 8 ? Math.ceil(n / 8) : 1;
+    xLabels.forEach((lbl, i) => {
+      if (i % tickEvery !== 0 && i !== n - 1) return;
+      const x = padL + slotW * i + slotW / 2;
+      xTicks += `<text x="${x}" y="${height - 8}" font-size="10.5" fill="#565f6c" text-anchor="middle">${lbl}</text>`;
+    });
+
+    return `
+      <div class="chart-wrap">
+        <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;max-width:${width}px;display:block;">
+          ${gridLines}
+          <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT + plotH}" stroke="#565f6c" stroke-width="1"/>
+          <line x1="${padL}" y1="${padT + plotH}" x2="${width - padR}" y2="${padT + plotH}" stroke="#565f6c" stroke-width="1"/>
+          ${bars}
+          ${xTicks}
+        </svg>
+      </div>
+    `;
+  }
+
   async function loadAndRenderAnalysis() {
     const body = document.getElementById('body');
     let snapshots;
@@ -1970,19 +2032,26 @@
     });
 
     // 5. Closure velocity — how many items newly became Closed between
-    // each consecutive pair of uploads.
+    // each consecutive pair of uploads. New Items per upload is computed
+    // in the same pass since both come from the same diff.
     const closuresPerInterval = [];
+    const newItemsPerInterval = [];
     for (let i = 1; i < chrono.length; i++) {
       const prevDetail = detailById[chrono[i - 1].id];
       const curDetail = detailById[chrono[i].id];
-      if (!prevDetail || !curDetail) { closuresPerInterval.push(0); continue; }
+      if (!prevDetail || !curDetail) { closuresPerInterval.push(0); newItemsPerInterval.push(0); continue; }
       const diff = diffSnapshotItems(prevDetail.issues, curDetail.issues);
       closuresPerInterval.push(diff.statusChanged.filter(c => c.to === 'closed').length);
+      newItemsPerInterval.push(diff.added.length);
     }
     const totalClosures = closuresPerInterval.reduce((a, b) => a + b, 0);
     const avgClosures = closuresPerInterval.length ? totalClosures / closuresPerInterval.length : 0;
     const currentOpenCount = issues.filter(i => i.status !== 'closed').length;
     const projectedUploads = avgClosures > 0 ? Math.ceil(currentOpenCount / avgClosures) : null;
+    // New Items chart x-axis: one bar per interval, labeled with the date
+    // of the NEWER upload in that pair (the upload where those items
+    // first showed up) — so it lines up with chrono.slice(1).
+    const newItemsXLabels = xLabels.slice(1);
 
     // 2. Stuck items — for each currently-open issue, walk backward
     // through uploads (newest to oldest) and count how many consecutive
@@ -2017,6 +2086,13 @@
           <div class="analysis-stat"><div class="analysis-stat-n">${totalClosures}</div><div class="analysis-stat-l">Total closed across all uploads</div></div>
           <div class="analysis-stat"><div class="analysis-stat-n">${projectedUploads !== null ? '~' + projectedUploads : '&mdash;'}</div><div class="analysis-stat-l">Projected uploads to clear ${currentOpenCount} current Open item(s)</div></div>
         </div>
+      </div>
+    `;
+
+    const newItemsHtml = `
+      <div class="analysis-card">
+        <div class="analysis-card-title">New Items per Upload</div>
+        ${renderBarChartSVG(newItemsPerInterval, newItemsXLabels, '#3d5a73')}
       </div>
     `;
 
@@ -2059,6 +2135,7 @@
             <div class="analysis-card-title">Walmart Blockers Over Time</div>
             ${renderLineChartSVG([{ name: 'Walmart Blockers', color: '#a3402f', points: blockerPoints }], xLabels)}
           </div>
+          ${newItemsHtml}
         </div>
         ${closureHtml}
         ${stuckHtml}
