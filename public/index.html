@@ -792,6 +792,7 @@
   #tifton-tracker .analysis-wrap { display: flex; flex-direction: column; gap: 16px; }
   #tifton-tracker .analysis-chart-row { display: flex; gap: 16px; flex-wrap: wrap; }
   #tifton-tracker .analysis-chart-row .analysis-card { flex: 1 1 320px; min-width: 0; margin-bottom: 0; }
+  #tifton-tracker .analysis-chart-row .analysis-card-pie { flex: 1 1 400px; max-width: 480px; }
   #tifton-tracker .analysis-header {
     font-family: 'Oswald', sans-serif;
     font-size: 17px;
@@ -814,7 +815,9 @@
   }
   #tifton-tracker .analysis-card-title .count { font-weight: 400; color: var(--ink-soft); font-size: 13px; }
   #tifton-tracker .chart-wrap { width: 100%; }
+  #tifton-tracker .chart-wrap-pie { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
   #tifton-tracker .chart-legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px; }
+  #tifton-tracker .chart-legend-side { flex-direction: column; flex-wrap: nowrap; gap: 9px; margin-top: 0; }
   #tifton-tracker .chart-legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink); }
   #tifton-tracker .chart-legend-swatch { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
   #tifton-tracker .analysis-stat-row { display: flex; gap: 20px; flex-wrap: wrap; }
@@ -2078,6 +2081,52 @@
     `;
   }
 
+  // A minimal hand-rolled SVG pie chart, matching the look of the other
+  // charts. series is [{ name, color, value }, ...]. Slices with a value
+  // of 0 are skipped entirely (no zero-width slivers).
+  function renderPieChartSVG(series) {
+    const width = 190, height = 190;
+    const cx = width / 2, cy = height / 2, r = 78;
+    const total = series.reduce((sum, s) => sum + s.value, 0);
+
+    let slices = '';
+    let legend = '';
+    if (total <= 0) {
+      slices = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#eceae2"/>`;
+    } else {
+      let startAngle = -Math.PI / 2; // start at 12 o'clock
+      series.forEach((s) => {
+        legend += `<span class="chart-legend-item"><span class="chart-legend-swatch" style="background:${s.color};"></span>${s.name} (${s.value})</span>`;
+        if (s.value <= 0) return;
+        const fraction = s.value / total;
+        // A slice covering the full circle (only one non-zero status)
+        // needs a plain circle — a 360° arc path has coincident start/end
+        // points and won't render as a filled wedge.
+        if (fraction >= 0.9999) {
+          slices += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${s.color}"/>`;
+          return;
+        }
+        const endAngle = startAngle + fraction * 2 * Math.PI;
+        const x1 = cx + r * Math.cos(startAngle);
+        const y1 = cy + r * Math.sin(startAngle);
+        const x2 = cx + r * Math.cos(endAngle);
+        const y2 = cy + r * Math.sin(endAngle);
+        const largeArc = (endAngle - startAngle) > Math.PI ? 1 : 0;
+        slices += `<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${largeArc} 1 ${x2},${y2} Z" fill="${s.color}" stroke="#ffffff" stroke-width="1.5"/>`;
+        startAngle = endAngle;
+      });
+    }
+
+    return `
+      <div class="chart-wrap chart-wrap-pie">
+        <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;max-width:${width}px;display:block;flex-shrink:0;">
+          ${slices}
+        </svg>
+        <div class="chart-legend chart-legend-side">${legend}</div>
+      </div>
+    `;
+  }
+
   async function loadAndRenderAnalysis() {
     const body = document.getElementById('body');
     let snapshots;
@@ -2237,6 +2286,29 @@
       </div>
     `;
 
+    // Current status breakdown — the same five statuses shown as Board
+    // columns, using live current data (not per-upload history like the
+    // other charts). Late and Walmart Blocker are flags on an item, not
+    // statuses, so they're intentionally left out.
+    const STATUS_PIE_COLORS = {
+      open: '#a3402f',
+      inprogress: '#c4791f',
+      testing: '#3d5a73',
+      readycustomer: '#4a6b4d',
+      readyinstall: '#6b7280',
+    };
+    const statusPieSeries = BOARD_STATUS_ORDER.map(st => ({
+      name: STATUS_LABELS[st],
+      color: STATUS_PIE_COLORS[st],
+      value: issues.filter(i => i.status === st).length,
+    }));
+    const statusPieHtml = `
+      <div class="analysis-card analysis-card-pie">
+        <div class="analysis-card-title">Current Status Breakdown</div>
+        ${renderPieChartSVG(statusPieSeries)}
+      </div>
+    `;
+
     const stuckHtml = stuckItems.length ? `
       <div class="analysis-card">
         <div class="analysis-card-title">Stuck Items <span class="count">(${stuckItems.length})</span></div>
@@ -2274,6 +2346,7 @@
           </div>
           ${newItemsHtml}
           ${closuresHtml}
+          ${statusPieHtml}
         </div>
         ${dueDateHtml}
         ${stuckHtml}
