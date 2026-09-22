@@ -72,6 +72,23 @@
     border-bottom: 1px solid rgba(255,255,255,0.25);
     background: rgba(255,255,255,0.12);
   }
+  #tifton-tracker .nav-filters {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  #tifton-tracker .nav-filters select {
+    width: 128px;
+  }
+  #tifton-tracker .nav-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-left: auto;
+  }
+  #tifton-tracker #search {
+    max-width: 210px;
+  }
   #tifton-tracker .as-of-nav {
     font-family: 'Oswald', sans-serif;
     font-size: 26px;
@@ -110,73 +127,37 @@
   }
   #tifton-tracker .stat-row {
     display: flex;
-    gap: 0;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    overflow: hidden;
-    background: var(--panel);
+    gap: 34px;
   }
   #tifton-tracker .stat {
-    padding: 8px 16px;
     text-align: center;
-    border-right: 1px solid var(--line);
-    min-width: 74px;
+    min-width: 60px;
   }
-  #tifton-tracker .stat:last-child { border-right: none; }
-  #tifton-tracker .stat .n { font-family: 'Oswald', sans-serif; font-size: 20px; font-weight: 600; line-height: 1; }
-  #tifton-tracker .stat .l { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); margin-top: 3px; }
-  #tifton-tracker .stat.open .n { color: var(--rust); }
-  #tifton-tracker .stat.inprogress .n { color: var(--amber); }
-  #tifton-tracker .stat.testing .n { color: var(--steel); }
-  #tifton-tracker .stat.readycustomer .n { color: var(--moss); }
-  #tifton-tracker .stat.readyinstall .n { color: var(--slate); }
-  #tifton-tracker .stat.monitoring .n { color: var(--plum); }
-  #tifton-tracker .stat.onhold .n { color: var(--forest); }
-  #tifton-tracker .stat.closed .n { color: var(--teal); }
+  #tifton-tracker .stat .n { font-family: 'Oswald', sans-serif; font-size: 34px; font-weight: 700; line-height: 1; color: #f3f1ea; }
+  #tifton-tracker .stat .l { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.06em; color: rgba(243,241,234,0.75); margin-top: 4px; }
   #tifton-tracker .stat.late-stat {
     cursor: pointer;
-    background: var(--amber-bg);
-    border-left: 2px solid var(--amber);
+    border-bottom: 2px solid var(--amber);
+    padding-bottom: 4px;
   }
-  #tifton-tracker .stat.late-stat .n { color: var(--amber); }
-  #tifton-tracker .stat.late-stat .l { color: var(--amber); font-weight: 600; }
-  #tifton-tracker .stat.late-stat:hover { background: #f6ddb8; }
-  #tifton-tracker .stat.late-stat.active { background: var(--amber); }
-  #tifton-tracker .stat.late-stat.active .n,
-  #tifton-tracker .stat.late-stat.active .l { color: white; }
+  #tifton-tracker .stat.late-stat:hover .n, #tifton-tracker .stat.late-stat:hover .l { color: var(--amber); }
+  #tifton-tracker .stat.late-stat.active .n, #tifton-tracker .stat.late-stat.active .l { color: var(--amber); }
   #tifton-tracker .stat.blocker-stat {
     cursor: pointer;
-    background: var(--rust-bg);
-    border-left: 2px solid var(--rust);
+    border-bottom: 2px solid var(--rust);
+    padding-bottom: 4px;
   }
-  #tifton-tracker .stat.blocker-stat .n { color: var(--rust); }
-  #tifton-tracker .stat.blocker-stat .l { color: var(--rust); font-weight: 600; }
-  #tifton-tracker .stat.blocker-stat:hover { background: #f4d9d3; }
-  #tifton-tracker .stat.blocker-stat.active { background: var(--rust); }
-  #tifton-tracker .stat.blocker-stat.active .n,
-  #tifton-tracker .stat.blocker-stat.active .l { color: white; }
+  #tifton-tracker .stat.blocker-stat:hover .n, #tifton-tracker .stat.blocker-stat:hover .l { color: var(--rust); }
+  #tifton-tracker .stat.blocker-stat.active .n, #tifton-tracker .stat.blocker-stat.active .l { color: var(--rust); }
 
   #tifton-tracker .toolbar {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    padding: 14px 24px;
-    border-bottom: 1px solid rgba(255,255,255,0.25);
+    padding: 0 24px;
     background: rgba(255,255,255,0.12);
   }
-  #tifton-tracker .toolbar-filters {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    flex-wrap: wrap;
-    justify-content: space-between;
-  }
-  #tifton-tracker .toolbar-filters > * { flex: 1 1 0; min-width: 0; }
-  #tifton-tracker .toolbar-search {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
+  #tifton-tracker .active-filters:empty { display: none; }
+  #tifton-tracker .active-filters:not(:empty) { padding: 10px 0; }
   #tifton-tracker .active-filters {
     flex: 1;
     display: flex;
@@ -931,29 +912,29 @@
       <button data-view="closed">Closed</button>
     </div>
     <div class="as-of-nav" id="as-of-nav"></div>
+    <div class="nav-right">
+      <div class="nav-filters">
+        <select id="filter-status">
+          <option value="">All statuses</option>
+        </select>
+        <select id="filter-blocker">
+          <option value="">Blocker: All</option>
+          <option value="Y">Walmart blocker only</option>
+          <option value="N">Not a blocker</option>
+        </select>
+        <select id="filter-missing">
+          <option value="">Missing info: All</option>
+          <option value="devops">Missing DevOps #</option>
+          <option value="target">Missing Due Date</option>
+          <option value="either">Missing DevOps # or Due Date</option>
+        </select>
+      </div>
+      <input type="text" id="search" placeholder="Search issues...">
+    </div>
   </div>
 
   <div class="toolbar">
-    <div class="toolbar-filters">
-      <select id="filter-status">
-        <option value="">All statuses</option>
-      </select>
-      <select id="filter-blocker">
-        <option value="">Blocker: All</option>
-        <option value="Y">Walmart blocker only</option>
-        <option value="N">Not a blocker</option>
-      </select>
-      <select id="filter-missing">
-        <option value="">Missing info: All</option>
-        <option value="devops">Missing DevOps #</option>
-        <option value="target">Missing Due Date</option>
-        <option value="either">Missing DevOps # or Due Date</option>
-      </select>
-      <input type="text" id="search" placeholder="Search issues...">
-    </div>
-    <div class="toolbar-search">
-      <div class="active-filters" id="active-filters"></div>
-    </div>
+    <div class="active-filters" id="active-filters"></div>
   </div>
 
   <div class="body" id="body"></div>
