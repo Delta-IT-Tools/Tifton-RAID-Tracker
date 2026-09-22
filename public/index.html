@@ -39,6 +39,7 @@
   }
   #tifton-tracker * { box-sizing: border-box; }
   #tifton-tracker .head {
+    position: relative;
     padding: 22px 24px 18px;
     background-color: #334249;
     border-radius: 10px 10px 0 0;
@@ -48,6 +49,25 @@
     align-items: flex-end;
     gap: 16px;
     flex-wrap: wrap;
+  }
+  #tifton-tracker .head-brand {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  #tifton-tracker .head-logo {
+    height: 100px;
+    width: auto;
+    display: block;
+    flex-shrink: 0;
+  }
+  #tifton-tracker .nav-row {
+    padding: 14px 24px;
+    display: flex;
+    justify-content: flex-start;
+    border-bottom: 1px solid rgba(255,255,255,0.25);
+    background: rgba(255,255,255,0.12);
   }
   #tifton-tracker .eyebrow {
     font-family: 'Oswald', 'Arial Narrow', sans-serif;
@@ -177,7 +197,16 @@
     padding: 0;
   }
   #tifton-tracker .filter-chip-x:hover { background: rgba(0,0,0,0.12); }
-  #tifton-tracker select, #tifton-tracker input[type=text] {
+  #tifton-tracker select {
+    font-family: inherit;
+    font-size: 11.5px;
+    padding: 4px 7px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--panel);
+    color: var(--ink);
+  }
+  #tifton-tracker input[type=text] {
     font-family: inherit;
     font-size: 13px;
     padding: 7px 10px;
@@ -193,13 +222,12 @@
     border: 1px solid var(--ink);
     border-radius: 6px;
     overflow: hidden;
-    margin-left: auto;
   }
   #tifton-tracker .view-toggle button {
     font-family: inherit;
-    font-size: 12.5px;
+    font-size: 15.5px;
     font-weight: 600;
-    padding: 7px 12px;
+    padding: 12px 20px;
     border: none;
     border-right: 1px solid #d5d5d5;
     background: var(--panel);
@@ -222,6 +250,23 @@
   }
   #tifton-tracker .btn-copy:hover { background: var(--ink); color: var(--paper); }
   #tifton-tracker .btn-copy.copied { background: var(--moss); border-color: var(--moss); color: white; }
+  #tifton-tracker .btn-copy-header {
+    position: absolute;
+    top: 16px;
+    right: 24px;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 5px 10px;
+    border: 1px solid rgba(243,241,234,0.5);
+    border-radius: 6px;
+    background: transparent;
+    color: rgba(243,241,234,0.9);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  #tifton-tracker .btn-copy-header:hover { background: rgba(243,241,234,0.15); border-color: rgba(243,241,234,0.8); color: #f3f1ea; }
+  #tifton-tracker .btn-copy-header.copied { background: var(--moss); border-color: var(--moss); color: white; }
 
   #tifton-tracker .data-io {
     display: flex;
@@ -327,18 +372,15 @@
     font-size: 15px;
     font-weight: 700;
     letter-spacing: 0.03em;
-    color: var(--ink);
-    background: var(--panel);
-    border: 1px solid var(--line);
-    border-left: 4px solid var(--steel);
-    border-radius: 6px;
-    padding: 10px 16px;
+    color: var(--rust);
+    background: transparent;
+    border: none;
+    padding: 0;
     margin-bottom: 14px;
   }
   #tifton-tracker .as-of-banner-empty {
     color: var(--ink-soft);
     font-weight: 600;
-    border-left-color: var(--slate);
     text-transform: none;
     letter-spacing: normal;
   }
@@ -865,12 +907,26 @@
 
 <div id="tifton-tracker">
   <div class="head">
-    <div>
-      <p class="eyebrow">HY-TEK &middot; DELTA GALIL</p>
-      <h1>TIFTON Go-Live Tracker</h1>
-      <p class="head-sub" id="header-summary">Loading&hellip;</p>
+    <div class="head-brand">
+      <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAO4AAABKCAYAAAC8Y2jaAAAUaElEQVR4nO2de3RV1Z3HP8m9SW5IgkECAQxDgCjqRAUHHyBSpGrLchy1dTk4LjtjcSy0HbUz1FYtPsrIWEdbpcux6ox2Rkdt60y16jjiA1sqWhVkjVahPgCJvEQMJCE3LzJ/fPfuubncc+65rzxwf9a6K7n3nLPPPufs3/79zt6/328X9fb24nA4CkYF0JbvQovzXaDD4ejDBcBl+S7UCa7DUViiwD8CNwLV+SrUCa7DUVhagU3A2cAdwFH5KNQJrsNRWKJAN/Ae0ADcBZyXa6FOcB2OwtKNhLcI+BBoB24AlgEjsy3UCa7DUVg+MH9jSIBbzW9fAO4BpmVTqBNch6OwrDOfP0HyVgzsBzYAo5DpfHGmhRa5eVyHo+A0ALcAY4Am81sJ0IVGmmuA54DlCdsDcYLrcPQPdcDlwCzgE/SuG03YPgbYCdwOvJiuMCe4Dkf/UQZcBFxqvlvtagX4EKSJHwbuAzr8CnKC63D0PzOAbyETejMyma3wRpH2XYdGnjelKsAJrsMxMIwErgDORZq3BSg127qACUAPsBR4OvlgJ7gOx8ByIfBN8//2hN87kOYdAzwA/BhNJQFOcB2OwUAj8G3gGOAjoNP83gGUA5PwTOcN4ATX4RgsVACLgL9AYYBdSdtrkCl9B/CwE1yHY3BxJnANmi5KFN5OoAqYCdwZTXGgw+EYGBpvfvqr89/btba6LFJelrxxZ0tT3ZiKiW9cdMJ3VjmN63AMAp58/f5Lfv7Kj77VvT8eG1FVuyNxW1vnnkM6O+Kx2Uee/+jCM5fdBLQ5wXU4BpZxNz922Q2vb3z2jMrYiE+Hx6paenr2F0ci0e6enu5oU/MHk+qqJ30wf+biW089+pzH7UFOcB2OAeKVDU+d9ZMXlixt79o7vLZq/BaAnp7uaCQS7W7rbqna+unGiTMmzXv6uvMfXAJsTDzWCa7D0f9Ef/ri0qt/9urtVx5aMXrn6KrDPmprb6sAiJWWdn6yb+fofZ2tlReevPjWC2ZccSeK6e2DE1yHo39pvOrBs//pza2rZ44bMXHj8LLq5s7Ojj8ORO1oaaobV12/afklK28kINjACa7D0U+sevvxc+59YcnSfV0tVeOq6zdBX9N4155tY2c0nPXUd8+95wZga1BZTnAdjn7gP15Yds1/rb3zGzWHjN2WqGVLS8s6tjZvqo93tpdfdMpVt/iZxsk4wXU4Cswjv7118b2/vv7G+tFHvVMRrWrp6en+o/9E06fvT64dPmHzPV97+WpCxOFanOA6HIVl4l8tP+IZgJqqwz6yQhvvbS/f3bqjduaks5/49jn/ciOwI7CUJJznlMNRQJ5d99CMto7WyroRk98HiESi3TtatowvLxm+d+GcZdd8YdrFD2RTrhNch6OAfNr+8ajiaKQnEol2A2xpfq/h6LEn/e6m+Y/eALyVbblOcB2OAlIWKW8vjZR1fLJv+xiA845bdNdX5l7zQyCeS7nJghsznzIUQmQj8vegaIW8rzrmGBCqUaRJGYr53IeCtH1zHDmyI1Jc0rVl9weTjqidum7h3KVLTp5y1lP5KDcK1APzgHFALXqgFShplRXcNqAZRej/H7AGeCfDc9WgeMMqvN4m3cjYCHOufw/YZyRwJWqEMWAV8IuQdToNLQfRnKIuRUnfU9V1OPAM8L8hzlWNsvxVovv+Bsps0F8ciTIMHosyDlYmbIujZ7sJWGvqltFgSQJTgIWoMygHfkUGo6VJ1AB/h9piOfAS8GiWZV2GAtYB3gTuDXnceShHFOg+LQd2hT1p0+53D58y+vi19y96/ULg3bDHpSOK4v+uR0mrOuj7QC2jEv6fg3rnNcBD6CGHoRI4AzXgViRk5QQL73izf5DgDkNZ4WOoU2glvOA2ApfgZdtLrEtr0r6p7ksNylgQRnBnmHPtNt+nAivIXkDC0mDOOwNlEUy0suzyGCVmv1nA+cB64OuoQ8uUc9HSkptRu6kEfkuIuckUVKA2U4naSgvZC+50UxaonYQV3Ea0YBfI8ryPDAR34ZnLfrnwzGV3kOfnHEU944eoAQL8DtiGgng7kCarRr30RLz1Tk4CZgMPonw46eg25bbhBQnHgUjAMdtQIwqiC3mZlKIHvDt49z40Aa+Q+qYmx0O2m7+Jqz8cShoPlwRmo+vZYr6PAk4Engh5fDacjbIJxtC9tvfqHXTtcbPtEGAsSlB2FBLY5I4rDNXAnwFvAx+jBj4eWXXvZVFeD2qXFaaen2RRhmUX3r3fluVxrWTeAb2W4f6hiKKbsx811GLgTlKnhIwhwZ2HeuVW9HAuR5rn+hDn22/+1qDcsQ+Ycv0owROYoGuAA03bMKxAgpucJgTgOjzTar35noowgwx1SMPuQZoD1ABmUjjBvRhYjDRfHAnVw8BTpBaimKnnGcCrZKchp5kydqDOoAO9TszwOWcYitGzzXW5nCI8JZHJoGzUfOz7fzbtLO+kugA/QYqjnvod4NcobeRw9E50HhL2+0OcsxfdwC4k/Nn07PmijeABN7vWC2RgHqVgDjCavh1iFPhTYDLwfg5lp2IeSn+yAW+8YjGwOuCYOBKubAUM4HR0v7rMpwSlXJmJXl9yGkl1eKTqxcL0RmuAv0cPpwo1vAsIv2hvD3qog5kiPAshQrBlEEQUOAV1EOXAI0gjDUMd34m5VfMA6oGrkTlYgiypKwkW2nxQBxyPnm0EjX90mu8NwHEFPv9nilzMj/XoBb8WadFy8rBg7yAiX76gjWiktRuZW08gTWhH7Gdw4Pt0LixAZuouNB6xHKX2LDQno44I1DE9idbCiaLrO6Uf6vCZIdf3hhXIdK5Gg1zTUc/r8DgVadcyNB0QRwMW3UgjHUt4SyUd9cDn0IDOSOD3FHbwK5G5yAIrwru+t9G1dyHBznohZ0dfchXcNjS3Ngw1yBrg8FwrdRBRjQR3HzIfV5rf38YbqRyGGn0+mIVM+lZkAT1H/zhVHIXmiTvNuV82v69C7aIDdSon9ENdPhPkY2Hr9eg9Jooa58QQx0RQYz7YmYpngexEA3mg6ZZX8VYon4WEPFemIO1mhffNPJQZhtPNOUvR4JadwnsXvRbYEd18dVADyaAIp8uHr/KnSAhtWaPT7F+ENHUDeuDlSdsjaAojrGPHYMY21BiyTBLni18Dvog0Uh3SRs/mcK4YMkU70D1uJTsHikypQANscWQ9JA6CdSC/gEY0BzsdzRVv7od6FYpBOx2UKe14a50UcaAgJmLn0ZrRQ/w8qXuwCPKQuZ3s5hMHA7XoGluRY8hLSdvXIjdD+943l9wFtxzdrzI0Z5zt9Ms0U04YjX0sEsY4sBd5SSWyBpiPLIExaGpoKAvuoCAfpnJRwicstsPwMzuK0bzjBTnUa6A5EXlW9SABfT1pexwJbyUaAT6O/Azs9ZhPtvwtcjGdGnL/0/DM5N9zoPPOWyi1aAx12KfhotJyJh830E7wW63bErCvbVDVaKBmBf5TIRX0XXZwqDEXvUIMR+ZjKgeO1cCXkRCPQyOv2fridiPrJ4qexTAyn3u+EDn1t/jUN5kaNM1jfc9f9NnvZWQubweOMP+vy7BujgTyIbjjkJC1o8bzUfDu9CJhbULvPwcjk9Eoqx3R9ZuSWY/uw1j03n8K8BjZvR60ImFrNP9XIX/opqCDEqhEAQK7TV3CtI0TUARX3Jwn2Uy2vAp8xZRZjEba14WslyMF+RDcqQn/dwB/CHFMD9l7Ig0FZiJNuxtpr0Y0ZWKveTUabW1DndfFSBs1oum0TEMmLX9AA15dqDOdRvhBvhHI3G0n/CvUqUi7x5EZfCYanygxdXgeeXBtQKPNx6J37+mooxhId9chTa6CW4t63T3oYTWRf7/boUYZ8oaKm085CpGzxJA5+h00GLUKmagg83Y22Qvua+acFUgo5gA/J5yAdCEXzwjhNP4E1NHsRR32eOCKhO3lwF8id8v3gd+giLKdaMrwePObIwtyHZz6EhpQ2Ysay4v0zxTEYOYI1DDbkCBG0T2xnw+RlroSjSi/hbRRNbqPp5A69jcMG1C003g8s3l+lmWlYyaqcxyvvrsTPpvRK8M3zLYX0PXZDCufL1C9Cs2Qn8dtRJpiG3pw25F/6medWUjbRNC87W3I/CxN2KfL7NODtNsqNKq8C81vTzO/ZcN9SChGoPGGryMTOox2CzszEEWWVhua4nkJ+CmyupLLsFOAO5BFMBtZaDPQ4FYmUVdBsdv9xaCYx81W4zYAP0CNzj68+wgf6GzD+vJNBC+iZyCoRCPDncgCWYUGYTagOVH7WY/ePZvNcb9BjizWIX9ODnVYD9yKXAzjSDBuxsv+4Ee3+YRpmNbFsRd1SM+ga3yLvtf5Jn0HoV7A8xarRVND6SjC03LpYrP7g870uxSeTDVuNfJ2WoAaWDvSDssJl77FBkVbjVNNerPQaq4wzgR20GskBzqCJJqsheJ4ZKZa/9xXQx63AfkvN6L6zSRzbZTIw2hEeQHSus3AEtSpPIneoZPvZw26R2E61JPQc+tGpv+6kPVaizJwlKMO/zTSpxnqxQuxrDD1TDWw2U5uGTLCMgr/wdWwI/g5YwW3kwN7kmpkCtegmxxDvrDj8VLajAT+Gbgn5Pm6UcPYi0zKk8zvfpq/DL0nXoW/F4+NsilFZvtxwB0pyrTX+p/A46SnB11nL+Ed9acl/L+R9Gl3ElmFBH87GviZRm6eVMtRhpJvIkHZhQTlZPT+uQ019nI0dXQY3jVPQKGBqYiaetq0N2sI3xnuQJbGbNShHEn6RAId5jzbkXk+lQOfrR3Jfgj/eXAbVgmZBV5YS2Sv+f5d8ze5DjHUgd1GP2RDjaKHdgTqCaPogTQg75l6+vrXWuGuRo3yx3iRIGHONR41iFa8IO8gL59yNK0SpJVLTD2r0KBICf6WRDmKIR5O+gyL40y5ZWhKJ937VQOaq7ReRE+QmcvhajQq24DeTxfhRddky8PovXIBEpYY6ghH0vedOxHr6rjOZ/vpaMrJmq1hn7/lZaQQStDU10XA9332LUKdSDXSpokpg5MpB/7V/E31bMfhBcBsTLHdjxpznG2DQdOYZyDFsYACD9JGkdl0P16PsgtpVqsxyvCyVexB4WivoPeyTHquFuRcEKOvdg96J7XCHZTcy2b+s6Z7UJnd6N3KpkgNmvZ4FrnwlaBOLd0USRWat2w23/8nzf7JbEb5vg7HS/tyCLmne3kPZcRoQNp2CmrEia8S1nljCxLYtfg/2yLgZ8grbA9exFNYXgbuRh1hBbIK/J7FPuCXeKZ1EN14WSVTlbcSzxMvE0vodfQsrHz4ta0e1CmOQh1jcwbnyJh0i35V0reHcUnRDw6Sn2sc5wwxpHCr9TkcQ5B8RAc5HI5+xgmuwzEEcYLrcAxBnOA6HEMQJ7gOxxDECa7DMQRxgutwDEGc4DocQ5CByLY33vzd4rM9hvxTNyT8ZrMfBkVfNOL5om5Fzu9BTDB/barQSnOejfi7+0VRcMQI5EroF/gwGbkufozcO8ci98A1pHbtq0VpXSpN3dPl4qo35fjdj0q0EmCZ+dj8xn7XFUOhhJXIzTPbDBwg18o20q9Bewy633a/Meh63vLZvw4v/U8Lcp3sj1UaBiUDIbh/gxrzD3y216BAgB8hP1VQpg1QxEsqpqKojOfRQ52PUqQswd+V72vo+q8y3ycCN6JVCDel2D9qttUjgRxJsOB+DjXG4SiQfRvyA04luNeafZ8DLkXZL+/wKRsUjLAR//txGlrQeiXyoW7B3/+4Gi3JWWXqWEpugnstigDyq5vlOLQI9ijzfSsKiEgluGV46xO/ARyNgjCuJbdlQYcsAyG4dunFILYBf416VesYHhQnOgJFj/wQ+d0+ihz2r8MTzGSSBag3zTnqUWTMxShiKmiFvRXmcynSfEt8zplY/ydQVMsq4FcokMNP89rwSD+qUSexNGAfy3SkbeeiTi7XNmHXxk3HI+azGLWJIEGPooCEu1FwSwXwD+b7l/kMpksaiHfcHoIfbBVqsK+ghGogYQwSdhszaR3ntwE3oaTkE3yO6aKvICXG36aiCZnv30OmbRgzzaamsR8/bD7kMhQXuxsvGiVM3ZOxqyc0ImskKCxyHbIwbkPWTq4rR3QQTnDtPelM+p6KHmR+29DKNuAWc2yYLBoHHQMhuMUEx7b2Io3xIDI5v4gEMV1KlQh9tcVO1PgP9dk/VXlB54gDNyAh+wVa9T0ddiG0dNg8xl9FAvQ9gs3VdPeiHY0lfAlZLtMC9t2Fsk4WAf9N7oIQCVG/RKKE1/KJ+8WReT3KZ9+DmoEwlfcT3Kv3ono1offcRcDTBGsgOFAj16H3y4999reDHBYbLB90Tz5Bpvc8JMQ9yCT2w6ZdSUfU7PskshLGpdk/XUhXFYo5vcV8T6dFdwCXAeeg62sm+0XX0lkXyWSbIyyGxiUey/L4Ic1AaNwo/lkMQA09isy7lShv0xKCza8i9CBtg6kxx7yE/8jrRqRdrBl5qjnvDp/9y/CWwnwaacmTA+oECsAOo3Er0bPYglLrLCB4Eeh0WipmzmtzOwcJUgzvuh5HnUJjiDr7UUZm2RgjIfdPjB+OoudrM2SmIoruYdBYxJBlIDRuKcEdhhVCW7e7gD8n2CQqRg10Onqnm4XM62UBxzyEchj9BL3nzUbZEf1GoQ8FLkeafyIaNLs7oHyQ4IZZscFO24AyLkRQwji/pUvKCV4VcS8asV2Kl8HkNlJ3YnVolHoLmsppCjhvGDqQiT4Waf57CB75HRaiTGuRjEeWwXT0DBbhPzBVB/wbEvDVPvsMWQYikD7dPG4FmhrZjKcpxpi/fouAVaM0L1WowW4lfKK1eUhDryY4aVkUzT02mHqtIH02kLHoetJNWUwxZVnBOhJ1RJt89p+MBCRoHvcYc26Q4K4idacURfdsEkoV87zPfmGpQ/coas77ZkA9IX17sHWsM3/tEqArCR5NrkQ5oBJnJg4a/h8PGTMx4muB5QAAAABJRU5ErkJggg==" alt="Delta Galil Industries" class="head-logo">
+      <div>
+        <h1>TIFTON Go-Live Tracker</h1>
+      </div>
     </div>
     <div class="stat-row" id="stat-row"></div>
+    <button class="btn-copy-header" id="btn-copy-view">Copy view</button>
+  </div>
+
+  <div class="nav-row">
+    <div class="view-toggle" id="view-toggle">
+      <button data-view="board" class="active">Board</button>
+      <button data-view="analysis">Analysis</button>
+      <button data-view="fdd">FDD</button>
+      <button data-view="history">History</button>
+      <button data-view="calendar">Calendar</button>
+      <button data-view="table">Table</button>
+      <button data-view="closed">Closed</button>
+    </div>
   </div>
 
   <div class="toolbar">
@@ -889,20 +945,10 @@
         <option value="target">Missing Due Date</option>
         <option value="either">Missing DevOps # or Due Date</option>
       </select>
-      <button class="btn-copy" id="btn-copy-view">Copy view</button>
+      <input type="text" id="search" placeholder="Search issues...">
     </div>
     <div class="toolbar-search">
-      <input type="text" id="search" placeholder="Search issues...">
       <div class="active-filters" id="active-filters"></div>
-      <div class="view-toggle" id="view-toggle">
-        <button data-view="analysis">Analysis</button>
-        <button data-view="board" class="active">Board</button>
-        <button data-view="fdd">FDD</button>
-        <button data-view="history">History</button>
-        <button data-view="calendar">Calendar</button>
-        <button data-view="table">Table</button>
-        <button data-view="closed">Closed</button>
-      </div>
     </div>
   </div>
 
@@ -1097,6 +1143,7 @@
 
   function renderHeaderSummary() {
     const el = document.getElementById('header-summary');
+    if (!el) return; // the header no longer shows this text, but keep the function harmless
     const n = issues.length;
     el.textContent = n === 0 ? 'No issues yet' : `${n} tracked issue${n === 1 ? '' : 's'}`;
   }
@@ -2063,29 +2110,17 @@
     const chrono = snapshots.slice().sort((a, b) => new Date(a.uploadedAt) - new Date(b.uploadedAt));
     const xLabels = chrono.map(s => shortDateLabel(s.uploadedAt));
 
-    // 1. Status trend lines
-    const trendKeys = [
-      { key: 'open', label: 'Open', color: '#a3402f' },
-      { key: 'inprogress', label: 'In Progress', color: '#c4791f' },
-      { key: 'testing', label: 'Testing', color: '#3d5a73' },
-      { key: 'closed', label: 'Closed', color: '#1f7a72' },
-    ];
-    const trendSeries = trendKeys.map(tk => ({
-      name: tk.label,
-      color: tk.color,
-      points: chrono.map(s => (s.statusCounts && s.statusCounts[tk.key]) || 0),
-    }));
-
-    // 4/7. Blocker count over time — not in statusCounts, so this needs
+    // Blocker count over time — not in statusCounts, so this needs
     // the full item list per snapshot (already fetched above).
     const blockerPoints = chrono.map(s => {
       const d = detailById[s.id];
       return d ? d.issues.filter(i => isBlocker(i.blocker)).length : 0;
     });
 
-    // 5. New Items per upload, computed from the same interval-by-interval
-    // diff used for date-change tracking below.
+    // New Items per upload and Closures per upload, computed from the
+    // same interval-by-interval diff used for date-change tracking below.
     const newItemsPerInterval = [];
+    const closuresPerInterval = [];
     let totalDateSlips = 0;
     let totalDatePullIns = 0;
     const dateSlipItems = [];
@@ -2093,9 +2128,10 @@
     for (let i = 1; i < chrono.length; i++) {
       const prevDetail = detailById[chrono[i - 1].id];
       const curDetail = detailById[chrono[i].id];
-      if (!prevDetail || !curDetail) { newItemsPerInterval.push(0); continue; }
+      if (!prevDetail || !curDetail) { newItemsPerInterval.push(0); closuresPerInterval.push(0); continue; }
       const diff = diffSnapshotItems(prevDetail.issues, curDetail.issues);
       newItemsPerInterval.push(diff.added.length);
+      closuresPerInterval.push(diff.statusChanged.filter(c => c.to === 'closed').length);
       diff.dateChanged.forEach(c => {
         const direction = dateChangeDirection(c.from, c.to);
         const record = { title: c.item.title, id: c.item.id, from: c.from, to: c.to, uploadedAt: chrono[i].uploadedAt };
@@ -2106,16 +2142,10 @@
     // Most recent change first within each list.
     dateSlipItems.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
     datePullInItems.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
-    // New Items chart x-axis: one bar per interval, labeled with the date
-    // of the NEWER upload in that pair (the upload where those items
-    // first showed up) — so it lines up with chrono.slice(1).
+    // New Items / Closures charts share an x-axis: one bar per interval,
+    // labeled with the date of the NEWER upload in that pair — so it
+    // lines up with chrono.slice(1).
     const newItemsXLabels = xLabels.slice(1);
-
-    // Closures over time — the running Closed count at each upload
-    // (items don't reopen in this tracker, so this doubles as a
-    // cumulative closures-to-date line). Reuses the same per-snapshot
-    // statusCounts already used for the Status Trends chart.
-    const closuresOverTimePoints = chrono.map(s => (s.statusCounts && s.statusCounts.closed) || 0);
 
     // 2. Stuck items — for each currently-open issue, walk backward
     // through uploads (newest to oldest) and count how many consecutive
@@ -2141,13 +2171,6 @@
       })
       .filter(s => s.streak >= 2)
       .sort((a, b) => b.streak - a.streak);
-
-    const closuresOverTimeHtml = `
-      <div class="analysis-card">
-        <div class="analysis-card-title">Closures Over Time</div>
-        ${renderLineChartSVG([{ name: 'Closed', color: '#1f7a72', points: closuresOverTimePoints }], xLabels)}
-      </div>
-    `;
 
     const renderDateChangeRows = (items) => items.map(r => `
       <tr data-id="${r.id}">
@@ -2191,7 +2214,14 @@
     const newItemsHtml = `
       <div class="analysis-card">
         <div class="analysis-card-title">New Items per Upload</div>
-        ${renderBarChartSVG(newItemsPerInterval, newItemsXLabels, '#3d5a73')}
+        ${renderBarChartSVG(newItemsPerInterval, newItemsXLabels, '#a3402f')}
+      </div>
+    `;
+
+    const closuresHtml = `
+      <div class="analysis-card">
+        <div class="analysis-card-title">Closures per Upload</div>
+        ${renderBarChartSVG(closuresPerInterval, newItemsXLabels, '#4a6b4d')}
       </div>
     `;
 
@@ -2227,15 +2257,11 @@
         <div class="analysis-header">Analysis <span class="count">(across ${chrono.length} uploads)</span></div>
         <div class="analysis-chart-row">
           <div class="analysis-card">
-            <div class="analysis-card-title">Status Trends</div>
-            ${renderLineChartSVG(trendSeries, xLabels)}
-          </div>
-          <div class="analysis-card">
             <div class="analysis-card-title">Walmart Blockers Over Time</div>
             ${renderLineChartSVG([{ name: 'Walmart Blockers', color: '#a3402f', points: blockerPoints }], xLabels)}
           </div>
           ${newItemsHtml}
-          ${closuresOverTimeHtml}
+          ${closuresHtml}
         </div>
         ${dueDateHtml}
         ${stuckHtml}
