@@ -2610,47 +2610,41 @@
   // ---------- Upload RAID Log (parses the source spreadsheet directly —
   // .xlsx, .xls, or .csv — then transforms it into this tracker's issue
   // format and records a historical snapshot of the result) ----------
-  //
-  // Columns are detected by matching HEADER TEXT, not by fixed position.
-  // This matters because different saved versions of the same RAID log
-  // have genuinely different column layouts (e.g. one export has a
-  // "DevOps" column and 22 total columns, another has no DevOps column
-  // at all and only 16) — a hardcoded position mapping silently misreads
-  // every field whenever that happens. Header-based detection adapts to
-  // whichever layout is actually in the uploaded file.
 
   function normalizeHeader(s) {
     return (s || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
   }
 
-  // Fixed column positions, per your explicit specification — not detected
-  // from header text. Header-text detection was tried first but proved too
-  // fragile: the same underlying sheet has used different exact wording for
-  // the same column across versions (and sometimes reordered columns
-  // entirely), which caused silent misreads. These exact positions are the
-  // ones you confirmed to trust for every RAID Log upload going forward.
-  //   A: RAID # (kept only for display — no longer used for the stable
-  //      ID; RAID # is just a spreadsheet row position, not a durable
-  //      identifier — see transformRaidRow)
-  //   B: Dev Ops        E: Deployment Status   J: Description
-  //   K: Turnover to DG Target Date            M: Walmart Blocker
-  //   P: Priority       R: Owner
-  // Columns not listed (Type, Internal/External, Notes, Latest Comment,
-  // DG Priority) are intentionally not read.
-  const FIXED_RAID_COLUMNS = {
-    raidNumber: 0,   // A
-    devops: 1,       // B
-    status: 4,       // E
-    description: 9,  // J
-    targetDate: 10,  // K
-    blocker: 12,     // M
-    priority: 15,    // P
-    owner: 17,       // R
+  // Columns are found by their HEADER TEXT in the RAID log's header row,
+  // not by fixed position, so inserting, removing or moving a column in
+  // Excel no longer shifts what the tracker reads. (Fixed positions broke
+  // when a "Scoping date" column was added at K, which pushed Walmart
+  // blocker from M to N and made every blocker read as blank.)
+  // Each field lists the exact header names it accepts, compared
+  // case-insensitively with extra spaces ignored. If none of them are
+  // found, that field is left blank and the upload dialog lists it under
+  // "Not found", so a renamed header shows up instead of silently misreading.
+  const RAID_HEADER_NAMES = {
+    raidNumber: ['raid #', 'raid#', 'raid no.', 'raid no', 'raid'],
+    devops: ['devops', 'dev ops', 'devops #', 'dev ops #'],
+    status: ['deployment status', 'status'],
+    description: ['description'],
+    targetDate: ['turnover to dg target date', 'target date'],
+    blocker: ['walmart blocker', 'walmart blockers'],
+    priority: ['priority'],
+    owner: ['owner'],
   };
 
-  function detectColumnMap() {
-    // Always the same fixed positions — see FIXED_RAID_COLUMNS above.
-    return Object.assign({}, FIXED_RAID_COLUMNS);
+  function detectColumnMap(headerRow) {
+    const headers = (headerRow || []).map(normalizeHeader);
+    const map = {};
+    Object.keys(RAID_HEADER_NAMES).forEach(field => {
+      for (const name of RAID_HEADER_NAMES[field]) {
+        const idx = headers.indexOf(name);
+        if (idx !== -1) { map[field] = idx; return; }
+      }
+    });
+    return map;
   }
 
   function mapRaidStatus(raw) {
@@ -2773,12 +2767,12 @@
     };
   }
 
-  // Turns a 2D array of raw cell values (however we got it — SheetJS,
   function isRaidHeaderCell(cell) {
     const h = normalizeHeader(cell);
     return h.indexOf('raid') === 0; // "RAID #", "RAID#", "RAID No.", etc.
   }
 
+  // Turns a 2D array of raw cell values (however we got it — SheetJS,
   // or a hand-parsed paste) into the intermediate row-object shape
   // transformRaidRow() expects, skipping the header row and any blank
   // separator rows (e.g. the "- Risks" section dividers in the source).
@@ -2841,17 +2835,24 @@
     return { objects: [], sheetName: null, columnMap: {} };
   }
 
+  // Only the fields the tracker actually reads are listed here, so the
+  // upload dialog's "Not found" line only flags a real problem.
   const RAID_FIELD_LABELS = {
-    raidNumber: 'RAID #', devops: 'DevOps', internalExternal: 'Internal/External', type: 'Type',
-    status: 'Status', blocker: 'Blocker', description: 'Description', targetDate: 'Target Date',
-    owner: 'Owner', priority: 'Priority', notes: 'Notes', latestComment: 'Latest Comment',
+    raidNumber: 'RAID #', devops: 'DevOps', status: 'Deployment Status', description: 'Description',
+    targetDate: 'Turnover to DG Target Date', blocker: 'Walmart Blocker', priority: 'Priority', owner: 'Owner',
   };
 
   function describeColumnMap(columnMap) {
-    const found = Object.keys(RAID_FIELD_LABELS).filter(f => columnMap[f] !== undefined).map(f => RAID_FIELD_LABELS[f]);
+    const letter = (i) => {
+      let s = '';
+      i = i + 1;
+      while (i > 0) { const r = (i - 1) % 26; s = String.fromCharCode(65 + r) + s; i = Math.floor((i - 1) / 26); }
+      return s;
+    };
+    const found = Object.keys(RAID_FIELD_LABELS).filter(f => columnMap[f] !== undefined).map(f => `${RAID_FIELD_LABELS[f]} (${letter(columnMap[f])})`);
     const missing = Object.keys(RAID_FIELD_LABELS).filter(f => columnMap[f] === undefined).map(f => RAID_FIELD_LABELS[f]);
     let text = 'Columns found: ' + (found.join(', ') || 'none');
-    if (missing.length) text += '. Not found: ' + missing.join(', ') + '.';
+    if (missing.length) text += '. <strong style="color:var(--rust);">Not found: ' + missing.join(', ') + '</strong> — check that the header text in the RAID log matches.';
     return text;
   }
 
