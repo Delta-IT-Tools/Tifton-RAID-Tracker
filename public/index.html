@@ -142,6 +142,13 @@
   }
   #tifton-tracker .stat.late-stat:hover .n, #tifton-tracker .stat.late-stat:hover .l { color: var(--amber); }
   #tifton-tracker .stat.late-stat.active .n, #tifton-tracker .stat.late-stat.active .l { color: var(--amber); }
+  #tifton-tracker .stat.scoping-stat {
+    cursor: pointer;
+    border-bottom: 2px solid #b9a3e0;
+    padding-bottom: 4px;
+  }
+  #tifton-tracker .stat.scoping-stat:hover .n, #tifton-tracker .stat.scoping-stat:hover .l { color: #cdb9f0; }
+  #tifton-tracker .stat.scoping-stat.active .n, #tifton-tracker .stat.scoping-stat.active .l { color: #cdb9f0; }
   #tifton-tracker .stat.blocker-stat {
     cursor: pointer;
     border-bottom: 2px solid var(--rust);
@@ -179,6 +186,7 @@
     white-space: nowrap;
   }
   #tifton-tracker .filter-chip.late-chip { color: var(--amber); background: var(--amber-bg); }
+  #tifton-tracker .filter-chip.scoping-chip { color: var(--plum); background: var(--plum-bg); }
   #tifton-tracker .filter-chip-x {
     display: inline-flex;
     align-items: center;
@@ -423,7 +431,8 @@
   #tifton-tracker .card.monitoring { border-left-color: var(--plum); }
   #tifton-tracker .card.onhold { border-left-color: var(--forest); }
   #tifton-tracker .card.closed { border-left-color: var(--teal); }
-  #tifton-tracker .card-top { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+  #tifton-tracker .card-top { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 8px; margin-bottom: 6px; }
+  #tifton-tracker .card-tag-right { margin-left: auto; }
   #tifton-tracker .tag {
     font-size: 10.5px;
     font-weight: 600;
@@ -447,7 +456,7 @@
     border-radius: 4px;
     white-space: nowrap;
   }
-  #tifton-tracker .card-tag-slot { display: flex; }
+  #tifton-tracker .card-tag-slot { display: flex; flex-wrap: wrap; gap: 4px; align-items: flex-start; }
   #tifton-tracker .late-tag {
     font-size: 11px;
     font-weight: 700;
@@ -459,8 +468,21 @@
     border-radius: 4px;
     white-space: nowrap;
   }
+  #tifton-tracker .scoping-late-tag {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: white;
+    background: var(--plum);
+    padding: 2px 7px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  #tifton-tracker .card.is-scoping-late { border-left-color: var(--plum); box-shadow: inset 0 0 0 1px var(--plum-bg); }
   #tifton-tracker .card.is-late { border-left-color: var(--amber); box-shadow: inset 0 0 0 1px var(--amber-bg); }
   #tifton-tracker .meta-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+  #tifton-tracker .date-row { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; margin-bottom: 6px; }
   #tifton-tracker .devops-tag {
     display: inline-block;
     font-family: monospace;
@@ -498,6 +520,21 @@
     background: var(--rust-bg);
     font-weight: 700;
   }
+  #tifton-tracker .scoping-tag {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--plum);
+    background: var(--plum-bg);
+    border-radius: 4px;
+    padding: 1px 7px;
+  }
+  #tifton-tracker .scoping-tag.scoping-tag-late {
+    color: white;
+    background: var(--plum);
+    font-weight: 700;
+  }
+  #tifton-tracker .date-tbd { opacity: 0.7; font-weight: 500; }
   #tifton-tracker .card-detail {
     font-size: 13.5px;
     color: var(--ink-soft);
@@ -967,6 +1004,11 @@
   // trackable elsewhere (Table view, Closed tab, filters), they're just
   // not given their own Board column.
   const BOARD_STATUS_ORDER = ['open', 'inprogress', 'testing', 'readycustomer', 'readyinstall'];
+  // Scoping (column K, "Scoping date") is the date Hy-Tek dev needs to
+  // determine and scope the issue. It only counts as overdue while the
+  // item is still Open or In Progress (Dev) — once it has moved on to
+  // Testing or later, the scoping work is clearly done.
+  const SCOPING_STATUSES = ['open', 'inprogress'];
 
   let issues = [];
   let currentAsOfDate = null;
@@ -1058,13 +1100,23 @@
     statusSel.value = curStatus;
   }
 
+  function isIsoDate(s) {
+    return /^\d{4}-\d{2}-\d{2}$/.test(s || '');
+  }
+
   // A target date that's a real ISO date (not text like "TBD" or "On Hold"),
   // in the past, and not yet closed — closed items don't count as "late"
   // even if their target date has passed, since the work is done.
   function isLate(issue) {
-    if (!issue.targetDate || !/^\d{4}-\d{2}-\d{2}$/.test(issue.targetDate)) return false;
+    if (!isIsoDate(issue.targetDate)) return false;
     if (issue.status === 'closed') return false;
     return issue.targetDate < todayISO();
+  }
+
+  function daysBetween(fromIso, toIso) {
+    const a = new Date(fromIso + 'T00:00:00');
+    const b = new Date(toIso + 'T00:00:00');
+    return Math.round((b - a) / 86400000);
   }
 
   // How many whole calendar days past the current target date an item is,
@@ -1073,12 +1125,25 @@
   // Only meaningful when isLate(issue) is true.
   function daysLate(issue) {
     if (!isLate(issue)) return 0;
-    const today = new Date(todayISO() + 'T00:00:00');
-    const target = new Date(issue.targetDate + 'T00:00:00');
-    return Math.round((today - target) / 86400000);
+    return daysBetween(issue.targetDate, todayISO());
   }
 
+  // Scoping date has passed while the item is still Open / In Progress (Dev).
+  function isScopingLate(issue) {
+    if (!isIsoDate(issue.scopingDate)) return false;
+    if (!SCOPING_STATUSES.includes(issue.status)) return false;
+    return issue.scopingDate < todayISO();
+  }
+
+  function daysScopingLate(issue) {
+    if (!isScopingLate(issue)) return 0;
+    return daysBetween(issue.scopingDate, todayISO());
+  }
+
+  function dayWord(n) { return n === 1 ? 'DAY' : 'DAYS'; }
+
   let lateFilterActive = false;
+  let scopingLateFilterActive = false;
 
   function getFiltered() {
     const status = document.getElementById('filter-status').value;
@@ -1092,11 +1157,12 @@
       const missingDevops = !i.devops;
       // "Missing" a due date means blank OR a non-date placeholder like
       // "TBD"/"On Hold"/"N/A" — anything that isn't a real, usable date.
-      const missingTarget = !i.targetDate || !/^\d{4}-\d{2}-\d{2}$/.test(i.targetDate);
+      const missingTarget = !isIsoDate(i.targetDate);
       if (missingFilter === 'devops' && !missingDevops) return false;
       if (missingFilter === 'target' && !missingTarget) return false;
       if (missingFilter === 'either' && !(missingDevops || missingTarget)) return false;
       if (lateFilterActive && !isLate(i)) return false;
+      if (scopingLateFilterActive && !isScopingLate(i)) return false;
       if (q) {
         const hay = (i.title + ' ' + i.detail + ' ' + (i.owner||'') + ' ' + (i.devops||'') + ' ' + (i.notes||'')).toLowerCase();
         if (!hay.includes(q)) return false;
@@ -1116,6 +1182,7 @@
     const blockerCount = issues.filter(i => isBlocker(i.blocker) && BOARD_STATUS_ORDER.includes(i.status)).length;
     const blockerActive = document.getElementById('filter-blocker').value === 'Y';
     const lateCount = issues.filter(i => isLate(i) && BOARD_STATUS_ORDER.includes(i.status)).length;
+    const scopingLateCount = issues.filter(isScopingLate).length;
     const row = document.getElementById('stat-row');
     // Mirrors the Board view's 5 columns for a clean, consistent header —
     // Monitoring/On Hold/Closed items are still fully counted and
@@ -1124,8 +1191,13 @@
     row.innerHTML = BOARD_STATUS_ORDER.map(s =>
       `<div class="stat ${s}"><div class="n">${counts[s]}</div><div class="l">${STATUS_LABELS[s]}</div></div>`
     ).join('')
+      + `<div class="stat scoping-stat${scopingLateFilterActive ? ' active' : ''}" id="scoping-stat" title="Click to show only items past their Hy-Tek scoping date (still Open or In Progress)"><div class="n">${scopingLateCount}</div><div class="l">Scoping Overdue</div></div>`
       + `<div class="stat late-stat${lateFilterActive ? ' active' : ''}" id="late-stat" title="Click to show only late items (target date has passed)"><div class="n">${lateCount}</div><div class="l">Late</div></div>`
       + `<div class="stat blocker-stat${blockerActive ? ' active' : ''}" id="blocker-stat" title="Click to show only Walmart blockers"><div class="n">${blockerCount}</div><div class="l">Walmart Blockers</div></div>`;
+    document.getElementById('scoping-stat').addEventListener('click', () => {
+      scopingLateFilterActive = !scopingLateFilterActive;
+      render();
+    });
     document.getElementById('late-stat').addEventListener('click', () => {
       lateFilterActive = !lateFilterActive;
       render();
@@ -1172,11 +1244,12 @@
     if (missing === 'devops') chips.push({ key: 'missing', label: 'Missing DevOps #' });
     if (missing === 'target') chips.push({ key: 'missing', label: 'Missing Due Date' });
     if (missing === 'either') chips.push({ key: 'missing', label: 'Missing DevOps # or Due Date' });
-    if (lateFilterActive) chips.push({ key: 'late', label: 'Late', late: true });
+    if (scopingLateFilterActive) chips.push({ key: 'scoping', label: 'Scoping overdue', cls: 'scoping-chip' });
+    if (lateFilterActive) chips.push({ key: 'late', label: 'Late', cls: 'late-chip' });
     if (search.trim()) chips.push({ key: 'search', label: `Search: "${search.trim()}"` });
 
     container.innerHTML = chips.map(c =>
-      `<span class="filter-chip${c.late ? ' late-chip' : ''}">${c.label}<button type="button" class="filter-chip-x" data-key="${c.key}" title="Remove this filter">&times;</button></span>`
+      `<span class="filter-chip${c.cls ? ' ' + c.cls : ''}">${c.label}<button type="button" class="filter-chip-x" data-key="${c.key}" title="Remove this filter">&times;</button></span>`
     ).join('');
 
     container.querySelectorAll('.filter-chip-x').forEach(btn => {
@@ -1186,6 +1259,7 @@
         else if (key === 'blocker') document.getElementById('filter-blocker').value = '';
         else if (key === 'missing') document.getElementById('filter-missing').value = '';
         else if (key === 'late') lateFilterActive = false;
+        else if (key === 'scoping') scopingLateFilterActive = false;
         else if (key === 'search') document.getElementById('search').value = '';
         render();
       });
@@ -1199,11 +1273,17 @@
     // dates — only attempt to reformat things that actually look like an
     // ISO date (YYYY-MM-DD); anything else is shown exactly as entered
     // rather than becoming "Invalid Date".
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
+    if (!isIsoDate(iso)) return iso;
     const [y, m, d] = iso.split('-').map(Number);
     const dt = new Date(y, m - 1, d);
     if (isNaN(dt)) return iso;
     return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  // For the two card dates: a blank cell reads "TBD" rather than
+  // disappearing, so every card always shows both lines.
+  function formatDateOrTbd(v) {
+    return v ? formatDate(v) : 'TBD';
   }
 
   function isBlocker(blocker) {
@@ -1214,17 +1294,21 @@
     const priorityClass = ['high','medium','low'].includes((issue.priority || '').toLowerCase()) ? issue.priority.toLowerCase() : '';
     const priorityLabel = priorityClass ? `${issue.priority} priority` : `Priority: ${issue.priority}`;
     const late = isLate(issue);
+    const scopingLate = isScopingLate(issue);
+    const sd = daysScopingLate(issue);
+    const td = daysLate(issue);
     return `
-      <div class="card ${issue.status}${late ? ' is-late' : ''}" data-id="${issue.id}">
+      <div class="card ${issue.status}${scopingLate ? ' is-scoping-late' : ''}${late ? ' is-late' : ''}" data-id="${issue.id}">
         <div class="card-top">
-          <div class="card-tag-slot card-tag-left">${late ? `<span class="late-tag">LATE: ${daysLate(issue)} DAY${daysLate(issue) === 1 ? '' : 'S'}</span>` : ''}</div>
+          <div class="card-tag-slot card-tag-left">${late ? `<span class="late-tag">LATE: ${td} ${dayWord(td)}</span>` : ''}${scopingLate ? `<span class="scoping-late-tag">SCOPING OVERDUE: ${sd} ${dayWord(sd)}</span>` : ''}</div>
           <div class="card-tag-slot card-tag-right">${isBlocker(issue.blocker) ? `<span class="blocker-tag">Walmart blocker${issue.blocker === 'Y/N' ? ' (Y/N)' : ''}</span>` : ''}</div>
         </div>
         <div class="card-title">${issue.title}</div>
         <div class="card-detail">${issue.detail}</div>
-        <div class="meta-row">
-          ${issue.priority ? `<span class="priority-tag ${priorityClass}">${priorityLabel}</span>` : ''}
-          ${issue.targetDate ? `<span class="target-tag${late ? ' target-tag-late' : ''}">Target: ${formatDate(issue.targetDate)}</span>` : ''}
+        ${issue.priority ? `<div class="meta-row"><span class="priority-tag ${priorityClass}">${priorityLabel}</span></div>` : ''}
+        <div class="date-row">
+          <span class="scoping-tag${scopingLate ? ' scoping-tag-late' : ''}" title="Scoping date — when Hy-Tek dev needs to determine and scope the issue">Scoping: <span class="${issue.scopingDate ? '' : 'date-tbd'}">${formatDateOrTbd(issue.scopingDate)}</span></span>
+          <span class="target-tag${late ? ' target-tag-late' : ''}" title="Target date — when Hy-Tek will deliver the update to Delta for UAT">Target (UAT): <span class="${issue.targetDate ? '' : 'date-tbd'}">${formatDateOrTbd(issue.targetDate)}</span></span>
         </div>
         <div class="card-footer">
           <div>
@@ -1249,6 +1333,32 @@
     return `<div class="board">${cols}</div>`;
   }
 
+  // Shared row markup for the Table and Closed views.
+  function issueTableHead() {
+    return `<thead><tr><th>Issue</th><th>DevOps #</th><th>Priority</th><th>Walmart Blocker</th><th>Reported</th><th>Scoping</th><th>Target (UAT)</th><th>Owner</th><th>Status</th></tr></thead>`;
+  }
+
+  function issueTableRow(i) {
+    const scopingLate = isScopingLate(i);
+    const late = isLate(i);
+    return `
+      <tr data-id="${i.id}">
+        <td>
+          <strong>${i.title}</strong><br><span style="color:var(--ink-soft);font-size:12px;">${i.detail}</span>
+          ${i.notes ? `<br><span style="color:var(--steel-dark);font-size:11.5px;font-style:italic;"><strong>Notes:</strong> ${i.notes}</span>` : ''}
+        </td>
+        <td>${i.devops || '—'}</td>
+        <td>${i.priority || '—'}</td>
+        <td>${isBlocker(i.blocker) ? `<span class="blocker-tag">${i.blocker}</span>` : (i.blocker || '—')}</td>
+        <td>${i.reportedDate ? formatDate(i.reportedDate) : '—'}</td>
+        <td${scopingLate ? ' style="color:var(--plum);font-weight:700;"' : ''}>${i.scopingDate ? formatDate(i.scopingDate) : '—'}</td>
+        <td${late ? ' style="color:var(--rust);font-weight:700;"' : ''}>${i.targetDate ? formatDate(i.targetDate) : '—'}</td>
+        <td>${i.owner || '—'}</td>
+        <td><span class="status-pill ${i.status}">${STATUS_LABELS[i.status]}</span></td>
+      </tr>
+    `;
+  }
+
   function renderTable(list) {
     const sorted = list.slice().sort((a,b) => {
       const statusDiff = STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status);
@@ -1266,25 +1376,9 @@
       <div class="closed-wrap">
         <div class="closed-header">RAID Log Tabular View <span class="count">(${sorted.length})</span></div>
         <table>
-          <thead><tr><th>Issue</th><th>DevOps #</th><th>Priority</th><th>Walmart Blocker</th><th>Reported</th><th>Target</th><th>Owner</th><th>Status</th></tr></thead>
+          ${issueTableHead()}
           <tbody>
-            ${sorted.map(i => `
-              <tr data-id="${i.id}">
-                <td>
-                  <strong>${i.title}</strong><br><span style="color:var(--ink-soft);font-size:12px;">${i.detail}</span>
-                  ${i.notes ? `<br><span style="color:var(--steel-dark);font-size:11.5px;font-style:italic;"><strong>Notes:</strong> ${i.notes}</span>` : ''}
-                </td>
-                <td>${i.devops || '—'}</td>
-                <td>${i.priority || '—'}</td>
-                <td>${isBlocker(i.blocker) ? `<span class="blocker-tag">${i.blocker}</span>` : (i.blocker || '—')}</td>
-                <td>${i.reportedDate ? formatDate(i.reportedDate) : '—'}</td>
-                <td>${i.targetDate ? formatDate(i.targetDate) : '—'}</td>
-                <td>${i.owner || '—'}</td>
-                <td>
-                  <span class="status-pill ${i.status}">${STATUS_LABELS[i.status]}</span>
-                </td>
-              </tr>
-            `).join('')}
+            ${sorted.map(issueTableRow).join('')}
           </tbody>
         </table>
       </div>
@@ -1363,23 +1457,9 @@
       <div class="closed-wrap">
         <div class="closed-header">Closed <span class="count">(${closed.length})</span></div>
         <table>
-          <thead><tr><th>Issue</th><th>DevOps #</th><th>Priority</th><th>Walmart Blocker</th><th>Reported</th><th>Target</th><th>Owner</th><th>Status</th></tr></thead>
+          ${issueTableHead()}
           <tbody>
-            ${closed.map(i => `
-              <tr data-id="${i.id}">
-                <td>
-                  <strong>${i.title}</strong><br><span style="color:var(--ink-soft);font-size:12px;">${i.detail}</span>
-                  ${i.notes ? `<br><span style="color:var(--steel-dark);font-size:11.5px;font-style:italic;"><strong>Notes:</strong> ${i.notes}</span>` : ''}
-                </td>
-                <td>${i.devops || '—'}</td>
-                <td>${i.priority || '—'}</td>
-                <td>${isBlocker(i.blocker) ? `<span class="blocker-tag">${i.blocker}</span>` : (i.blocker || '—')}</td>
-                <td>${i.reportedDate ? formatDate(i.reportedDate) : '—'}</td>
-                <td>${i.targetDate ? formatDate(i.targetDate) : '—'}</td>
-                <td>${i.owner || '—'}</td>
-                <td><span class="status-pill ${i.status}">${STATUS_LABELS[i.status]}</span></td>
-              </tr>
-            `).join('')}
+            ${closed.map(issueTableRow).join('')}
           </tbody>
         </table>
       </div>
@@ -1726,8 +1806,8 @@
   // old and new values are real ISO dates — comparing "TBD" to "TBD" or
   // to a real date isn't a meaningful direction, just a text change.
   function dateChangeDirection(fromDate, toDate) {
-    const fromValid = /^\d{4}-\d{2}-\d{2}$/.test(fromDate || '');
-    const toValid = /^\d{4}-\d{2}-\d{2}$/.test(toDate || '');
+    const fromValid = isIsoDate(fromDate);
+    const toValid = isIsoDate(toDate);
     if (!fromValid || !toValid) return null;
     if (toDate > fromDate) return 'slip';
     if (toDate < fromDate) return 'pullin';
@@ -2629,6 +2709,7 @@
     devops: ['devops', 'dev ops', 'devops #', 'dev ops #'],
     status: ['deployment status', 'status'],
     description: ['description'],
+    scopingDate: ['scoping date'],
     targetDate: ['turnover to dg target date', 'target date'],
     blocker: ['walmart blocker', 'walmart blockers'],
     priority: ['priority'],
@@ -2761,6 +2842,7 @@
       devops: devops,
       priority: (row.priority || '').toString().trim(),
       blocker: mapRaidBlocker(row.blocker),
+      scopingDate: excelCellToDateString(row.scopingDate),
       targetDate: excelCellToDateString(row.targetDate),
       notes: noteParts.join('\n\n'),
       reportedDate: '',
@@ -2806,6 +2888,7 @@
         status: get(r, 'status'),
         blocker: get(r, 'blocker'),
         description,
+        scopingDate: get(r, 'scopingDate'),
         targetDate: get(r, 'targetDate'),
         owner: get(r, 'owner'),
         priority: get(r, 'priority'),
@@ -2839,7 +2922,7 @@
   // upload dialog's "Not found" line only flags a real problem.
   const RAID_FIELD_LABELS = {
     raidNumber: 'RAID #', devops: 'DevOps', status: 'Deployment Status', description: 'Description',
-    targetDate: 'Turnover to DG Target Date', blocker: 'Walmart Blocker', priority: 'Priority', owner: 'Owner',
+    scopingDate: 'Scoping date', targetDate: 'Turnover to DG Target Date', blocker: 'Walmart Blocker', priority: 'Priority', owner: 'Owner',
   };
 
   function describeColumnMap(columnMap) {
@@ -3144,9 +3227,9 @@
         const statusDiff = STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status);
         return statusDiff !== 0 ? statusDiff : a.title.localeCompare(b.title);
       }).map(i => {
-        return [i.title, i.detail, i.devops || '\u2014', i.priority || '\u2014', i.blocker || '\u2014', i.reportedDate ? formatDate(i.reportedDate) : '\u2014', i.targetDate ? formatDate(i.targetDate) : '\u2014', i.notes || '\u2014', i.owner || '\u2014', statusText(i.status)].join('\t');
+        return [i.title, i.detail, i.devops || '\u2014', i.priority || '\u2014', i.blocker || '\u2014', i.reportedDate ? formatDate(i.reportedDate) : '\u2014', i.scopingDate ? formatDate(i.scopingDate) : '\u2014', i.targetDate ? formatDate(i.targetDate) : '\u2014', i.notes || '\u2014', i.owner || '\u2014', statusText(i.status)].join('\t');
       });
-      const cols = ['Title', 'Detail', 'DevOps #', 'Priority', 'Walmart Blocker', 'Reported', 'Target', 'Notes', 'Owner', 'Status'].join('\t');
+      const cols = ['Title', 'Detail', 'DevOps #', 'Priority', 'Walmart Blocker', 'Reported', 'Scoping', 'Target (UAT)', 'Notes', 'Owner', 'Status'].join('\t');
       return header + '\n' + cols + '\n' + rows.join('\n');
     }
 
@@ -3170,9 +3253,10 @@
     const priority = i.priority ? `  |  ${i.priority} priority` : '';
     const blocker = isBlocker(i.blocker) ? `  |  WALMART BLOCKER${i.blocker === 'Y/N' ? ' (Y/N)' : ''}` : '';
     const reported = i.reportedDate ? `  |  Reported: ${formatDate(i.reportedDate)}` : '';
-    const target = i.targetDate ? `  |  Target: ${formatDate(i.targetDate)}` : '';
+    const scoping = `  |  Scoping: ${formatDateOrTbd(i.scopingDate)}${isScopingLate(i) ? ' (OVERDUE)' : ''}`;
+    const target = `  |  Target (UAT): ${formatDateOrTbd(i.targetDate)}${isLate(i) ? ' (LATE)' : ''}`;
     const notes = i.notes ? `\nNotes: ${i.notes}` : '';
-    return `${devopsPrefix}${i.title}\n${i.detail}${owner}${priority}${blocker}${reported}${target}${notes}`;
+    return `${devopsPrefix}${i.title}\n${i.detail}${owner}${priority}${blocker}${reported}${scoping}${target}${notes}`;
   }
 
   // Colors mirrored from the app's CSS variables, hardcoded here since inline
@@ -3217,7 +3301,8 @@
     if (i.priority) { const pc = priorityEmailColor(i.priority); if (pc) chips.push(chip(i.priority + ' priority', pc)); }
     if (isBlocker(i.blocker)) chips.push(chip('WALMART BLOCKER' + (i.blocker === 'Y/N' ? ' (Y/N)' : ''), 'rust'));
     if (i.reportedDate) chips.push(chip('Reported: ' + formatDate(i.reportedDate), 'slate'));
-    if (i.targetDate) chips.push(chip('Target: ' + formatDate(i.targetDate), 'slate'));
+    chips.push(chip('Scoping: ' + formatDateOrTbd(i.scopingDate) + (isScopingLate(i) ? ' (OVERDUE)' : ''), 'plum'));
+    chips.push(chip('Target (UAT): ' + formatDateOrTbd(i.targetDate) + (isLate(i) ? ' (LATE)' : ''), isLate(i) ? 'rust' : 'slate'));
     return chips.join('');
   }
 
@@ -3240,6 +3325,7 @@
         return statusDiff !== 0 ? statusDiff : a.title.localeCompare(b.title);
       });
       const th = (label) => `<th style="text-align:left;padding:6px 10px;border-bottom:2px solid ${EMAIL_COLORS.ink};font-size:11px;text-transform:uppercase;letter-spacing:0.03em;color:${EMAIL_COLORS.inkSoft};">${esc(label)}</th>`;
+      const td = `padding:8px 10px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;font-size:12.5px;`;
       const rowsHtml = sorted.map(i => {
         const statusColor = EMAIL_COLORS[STATUS_EMAIL_COLOR[i.status]];
         const statusBg = EMAIL_COLORS[STATUS_EMAIL_COLOR[i.status] + 'Bg'];
@@ -3250,12 +3336,13 @@
               <div style="font-size:12px;color:${EMAIL_COLORS.inkSoft};margin-top:2px;">${escNl(i.detail)}</div>
               ${i.notes ? `<div style="font-size:11.5px;color:${EMAIL_COLORS.steel};font-style:italic;margin-top:4px;"><strong>Notes:</strong> ${escNl(i.notes)}</div>` : ''}
             </td>
-            <td style="padding:8px 10px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;font-size:12.5px;">${esc(i.devops) || '&mdash;'}</td>
-            <td style="padding:8px 10px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;font-size:12.5px;">${esc(i.priority) || '&mdash;'}</td>
-            <td style="padding:8px 10px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;font-size:12.5px;${isBlocker(i.blocker) ? `color:${EMAIL_COLORS.rust};font-weight:700;` : ''}">${isBlocker(i.blocker) ? 'YES' + (i.blocker === 'Y/N' ? ' (Y/N)' : '') : (esc(i.blocker) || '&mdash;')}</td>
-            <td style="padding:8px 10px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;font-size:12.5px;">${i.reportedDate ? esc(formatDate(i.reportedDate)) : '&mdash;'}</td>
-            <td style="padding:8px 10px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;font-size:12.5px;">${i.targetDate ? esc(formatDate(i.targetDate)) : '&mdash;'}</td>
-            <td style="padding:8px 10px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;font-size:12.5px;">${esc(i.owner) || '&mdash;'}</td>
+            <td style="${td}">${esc(i.devops) || '&mdash;'}</td>
+            <td style="${td}">${esc(i.priority) || '&mdash;'}</td>
+            <td style="${td}${isBlocker(i.blocker) ? `color:${EMAIL_COLORS.rust};font-weight:700;` : ''}">${isBlocker(i.blocker) ? 'YES' + (i.blocker === 'Y/N' ? ' (Y/N)' : '') : (esc(i.blocker) || '&mdash;')}</td>
+            <td style="${td}">${i.reportedDate ? esc(formatDate(i.reportedDate)) : '&mdash;'}</td>
+            <td style="${td}${isScopingLate(i) ? `color:${EMAIL_COLORS.plum};font-weight:700;` : ''}">${i.scopingDate ? esc(formatDate(i.scopingDate)) : '&mdash;'}</td>
+            <td style="${td}${isLate(i) ? `color:${EMAIL_COLORS.rust};font-weight:700;` : ''}">${i.targetDate ? esc(formatDate(i.targetDate)) : '&mdash;'}</td>
+            <td style="${td}">${esc(i.owner) || '&mdash;'}</td>
             <td style="padding:8px 10px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;">
               <span style="display:inline-block;font-size:11px;font-weight:700;color:${statusColor};background:${statusBg};border-radius:100px;padding:3px 10px;white-space:nowrap;">${esc(STATUS_LABELS[i.status])}</span>
             </td>
@@ -3265,7 +3352,7 @@
         <div style="${font}">
           ${headerHtml}
           <table style="border-collapse:collapse;width:100%;">
-            <thead><tr>${th('Issue')}${th('DevOps #')}${th('Priority')}${th('Walmart Blocker')}${th('Reported')}${th('Target')}${th('Owner')}${th('Status')}</tr></thead>
+            <thead><tr>${th('Issue')}${th('DevOps #')}${th('Priority')}${th('Walmart Blocker')}${th('Reported')}${th('Scoping')}${th('Target (UAT)')}${th('Owner')}${th('Status')}</tr></thead>
             <tbody>${rowsHtml}</tbody>
           </table>
         </div>`;
@@ -3387,7 +3474,7 @@
 
   function openModal(id) {
     editingId = id || null;
-    const issue = id ? issues.find(i => i.id === id) : { title:'', detail:'', status: STATUS_ORDER[0], owner:'', devops:'', priority:'', blocker:'', targetDate:'', notes:'', reportedDate: todayISO() };
+    const issue = id ? issues.find(i => i.id === id) : { title:'', detail:'', status: STATUS_ORDER[0], owner:'', devops:'', priority:'', blocker:'', scopingDate:'', targetDate:'', notes:'', reportedDate: todayISO() };
     const backdrop = document.createElement('div');
     backdrop.className = 'modal-backdrop';
     backdrop.innerHTML = `
@@ -3408,9 +3495,10 @@
             </select>
           </div>
         </div>
+        <div class="field"><label>Reported date</label><input type="date" id="m-reported" value="${issue.reportedDate||''}"></div>
         <div class="field-row">
-          <div class="field"><label>Reported date</label><input type="date" id="m-reported" value="${issue.reportedDate||''}"></div>
-          <div class="field"><label>Target completion date</label><input type="date" id="m-target" value="${issue.targetDate||''}"></div>
+          <div class="field"><label>Scoping date (Hy-Tek)</label><input type="date" id="m-scoping" value="${isIsoDate(issue.scopingDate) ? issue.scopingDate : ''}"></div>
+          <div class="field"><label>Target (UAT) date</label><input type="date" id="m-target" value="${issue.targetDate||''}"></div>
         </div>
         <div class="field">
           <label>Walmart blocker</label>
@@ -3451,6 +3539,7 @@
       });
     }
     document.getElementById('m-save').addEventListener('click', async () => {
+      const scopingInput = document.getElementById('m-scoping').value;
       const data = {
         title: document.getElementById('m-title').value.trim(),
         detail: document.getElementById('m-detail').value.trim(),
@@ -3460,6 +3549,9 @@
         priority: document.getElementById('m-priority').value,
         blocker: document.getElementById('m-blocker').value,
         reportedDate: document.getElementById('m-reported').value,
+        // Keep a text placeholder from the RAID log (e.g. "TBD") if the
+        // date picker was left empty, rather than silently wiping it.
+        scopingDate: scopingInput || (isIsoDate(issue.scopingDate) ? '' : (issue.scopingDate || '')),
         targetDate: document.getElementById('m-target').value,
         notes: document.getElementById('m-notes').value.trim(),
       };
