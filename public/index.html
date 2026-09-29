@@ -78,7 +78,10 @@
     gap: 8px;
   }
   #tifton-tracker .nav-filters select {
-    width: 128px;
+    width: 150px;
+  }
+  #tifton-tracker .nav-filters #filter-missing {
+    width: 170px;
   }
   #tifton-tracker .nav-right {
     display: flex;
@@ -962,8 +965,9 @@
         <select id="filter-missing">
           <option value="">Missing info: All</option>
           <option value="devops">Missing DevOps #</option>
-          <option value="target">Missing Due Date</option>
-          <option value="either">Missing DevOps # or Due Date</option>
+          <option value="scoping">Missing Scoping Date</option>
+          <option value="target">Missing Target (UAT) Date</option>
+          <option value="either">Missing DevOps # or Target Date</option>
         </select>
       </div>
       <input type="text" id="search" placeholder="Search issues...">
@@ -1159,6 +1163,9 @@
       // "TBD"/"On Hold"/"N/A" — anything that isn't a real, usable date.
       const missingTarget = !isIsoDate(i.targetDate);
       if (missingFilter === 'devops' && !missingDevops) return false;
+      // Same rule for Scoping: blank or a text placeholder counts as missing.
+      const missingScoping = !isIsoDate(i.scopingDate);
+      if (missingFilter === 'scoping' && !missingScoping) return false;
       if (missingFilter === 'target' && !missingTarget) return false;
       if (missingFilter === 'either' && !(missingDevops || missingTarget)) return false;
       if (lateFilterActive && !isLate(i)) return false;
@@ -1242,8 +1249,9 @@
     if (blocker === 'Y') chips.push({ key: 'blocker', label: 'Walmart blocker only' });
     if (blocker === 'N') chips.push({ key: 'blocker', label: 'Not a blocker' });
     if (missing === 'devops') chips.push({ key: 'missing', label: 'Missing DevOps #' });
-    if (missing === 'target') chips.push({ key: 'missing', label: 'Missing Due Date' });
-    if (missing === 'either') chips.push({ key: 'missing', label: 'Missing DevOps # or Due Date' });
+    if (missing === 'scoping') chips.push({ key: 'missing', label: 'Missing Scoping Date' });
+    if (missing === 'target') chips.push({ key: 'missing', label: 'Missing Target (UAT) Date' });
+    if (missing === 'either') chips.push({ key: 'missing', label: 'Missing DevOps # or Target Date' });
     if (scopingLateFilterActive) chips.push({ key: 'scoping', label: 'Scoping overdue', cls: 'scoping-chip' });
     if (lateFilterActive) chips.push({ key: 'late', label: 'Late', cls: 'late-chip' });
     if (search.trim()) chips.push({ key: 'search', label: `Search: "${search.trim()}"` });
