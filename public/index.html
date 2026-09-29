@@ -2827,6 +2827,10 @@
   function transformRaidRow(row, index) {
     const raidNumber = (row.raidNumber || '').toString().trim();
     const devops = (row.devops || '').toString().trim();
+    // Line breaks / repeated spaces inside the DevOps cell (e.g. "Parent
+    // 14185,<line break>24242") are collapsed for the id only, since an id
+    // containing a line break can't be matched back when the card is clicked.
+    const devopsKey = devops.replace(/\s+/g, ' ');
     const noteParts = [];
     if (row.notes) noteParts.push(row.notes);
     if (row.latestComment) noteParts.push('Latest comment: ' + row.latestComment);
@@ -2838,7 +2842,10 @@
     // never match anything in another upload — diffSnapshotItems()
     // recognizes that prefix and reports them as "unmatched" rather than
     // silently counting them as new or removed every time.
-    const id = devops ? ('devops-' + devops) : ('nodevops-' + (raidNumber || 'row') + '-' + (_raidRowSeq++));
+    // A DevOps value with no digits in it (e.g. "N/A - DG") isn't a real
+    // ticket number, so it's treated like a blank one for the id — otherwise
+    // every "N/A - DG" row would share one id and open the wrong card.
+    const id = hasRealDevops(devops) ? ('devops-' + devopsKey) : ('nodevops-' + (raidNumber || 'row') + '-' + (_raidRowSeq++));
     return {
       id: id,
       raidNumber: raidNumber,
@@ -2855,6 +2862,47 @@
       notes: noteParts.join('\n\n'),
       reportedDate: '',
     };
+  }
+
+  function hasRealDevops(devops) {
+    return /\d/.test(devops || '');
+  }
+
+  // Two rows sometimes carry the same DevOps # (a typo, or a copied row).
+  // Every card needs its own id, or clicking one opens the other. For each
+  // duplicated DevOps #, the first row that isn't Closed keeps the plain
+  // 'devops-<n>' id (so its History and FDD file stay attached) and the
+  // others get the RAID # appended, e.g. 'devops-17678-raid110'.
+  function makeIdsUnique(list) {
+    const groups = {};
+    list.forEach(it => { (groups[it.id] = groups[it.id] || []).push(it); });
+    Object.keys(groups).forEach(id => {
+      const g = groups[id];
+      if (g.length < 2) return;
+      const keeper = g.find(it => it.status !== 'closed') || g[0];
+      g.forEach(it => { if (it !== keeper) it.id = id + '-raid' + (it.raidNumber || 'row'); });
+    });
+    // Final safety net in case RAID #s repeat as well.
+    const seen = new Set();
+    list.forEach(it => {
+      let candidate = it.id, n = 2;
+      while (seen.has(candidate)) candidate = it.id + '-' + (n++);
+      it.id = candidate;
+      seen.add(candidate);
+    });
+    return list;
+  }
+
+  // For the upload dialog: lists each real DevOps # used on more than one
+  // row, with the RAID #s involved, so it can be corrected in the RAID log.
+  function findDuplicateDevops(objects) {
+    const byDevops = {};
+    objects.forEach(o => {
+      const d = (o.devops || '').toString().trim();
+      if (!hasRealDevops(d)) return;
+      (byDevops[d] = byDevops[d] || []).push((o.raidNumber || '?').toString().trim());
+    });
+    return Object.keys(byDevops).filter(d => byDevops[d].length > 1).map(d => ({ devops: d, raids: byDevops[d] }));
   }
 
   function isRaidHeaderCell(cell) {
@@ -3020,7 +3068,9 @@
             return;
           }
           pendingObjects = objects;
-          fileStatusEl.innerHTML = `Found ${objects.length} row(s) in sheet "${sheetName}". Click Upload to continue.<br><span style="opacity:0.8;">${describeColumnMap(columnMap)}</span>`;
+          const dups = findDuplicateDevops(objects);
+          const dupHtml = dups.length ? `<br><strong style="color:var(--amber);">Same DevOps # on more than one row:</strong> ${dups.map(d => `${d.devops} (RAID # ${d.raids.join(', ')})`).join('; ')}. Each still gets its own card, but you may want to correct the RAID log.` : '';
+          fileStatusEl.innerHTML = `Found ${objects.length} row(s) in sheet "${sheetName}". Click Upload to continue.<br><span style="opacity:0.8;">${describeColumnMap(columnMap)}</span>${dupHtml}`;
         } catch (e) {
           pendingObjects = null;
           fileStatusEl.textContent = '';
@@ -3056,7 +3106,7 @@
       const snapshotDate = dateInput.value || todayISO();
       const isHistorical = snapshotDate !== todayISO();
       _raidRowSeq = 0;
-      const transformed = objects.map((row, i) => transformRaidRow(row, i));
+      const transformed = makeIdsUnique(objects.map((row, i) => transformRaidRow(row, i)));
       close();
 
       const confirmMessage = isHistorical
