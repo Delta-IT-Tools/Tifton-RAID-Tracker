@@ -900,6 +900,33 @@
     border: 1px solid var(--line);
   }
   #tifton-tracker .modal h2 { font-family: 'Oswald', sans-serif; font-size: 18px; margin: 0 0 14px; }
+  /* Per-issue history (inside the edit modal) */
+  #tifton-tracker .modal-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+  #tifton-tracker .modal-head h2 { margin: 0; }
+  #tifton-tracker .btn-history {
+    font-family: inherit; font-size: 12px; font-weight: 600; padding: 6px 10px;
+    border: 1px solid var(--line); border-radius: 6px; background: var(--paper); color: var(--steel); cursor: pointer;
+  }
+  #tifton-tracker .btn-history:hover, #tifton-tracker .btn-history.active { border-color: var(--steel); }
+  #tifton-tracker .issue-history { border: 1px solid var(--line); border-radius: 8px; background: var(--paper); padding: 12px 14px; margin-bottom: 14px; }
+  #tifton-tracker .issue-history-title { font-family: 'Oswald', sans-serif; font-size: 14px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
+  #tifton-tracker .issue-history-summary { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  #tifton-tracker .ih-chip { font-size: 11.5px; font-weight: 600; padding: 3px 8px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); color: var(--ink-soft); }
+  #tifton-tracker .ih-chip.slip { background: var(--rust-bg); border-color: transparent; color: var(--rust); }
+  #tifton-tracker .issue-history-note { font-size: 12px; color: var(--ink-soft); margin: 0 0 8px; }
+  #tifton-tracker .ih-list { list-style: none; margin: 0; padding: 0; max-height: 300px; overflow-y: auto; }
+  #tifton-tracker .ih-event { position: relative; padding: 0 0 10px 16px; border-left: 2px solid var(--line); margin-left: 4px; }
+  #tifton-tracker .ih-event:last-child { padding-bottom: 0; }
+  #tifton-tracker .ih-event::before { content: ""; position: absolute; left: -6px; top: 3px; width: 10px; height: 10px; border-radius: 50%; background: var(--steel); }
+  #tifton-tracker .ih-event.slip::before { background: var(--rust); }
+  #tifton-tracker .ih-when { font-size: 11.5px; color: var(--ink-soft); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  #tifton-tracker .ih-source { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 1px 6px; border-radius: 4px; background: var(--panel); border: 1px solid var(--line); }
+  #tifton-tracker .ih-change { font-size: 12.5px; color: var(--ink); margin-top: 2px; }
+  #tifton-tracker .ih-change .ih-field { font-weight: 600; }
+  #tifton-tracker .ih-change .ih-old { color: var(--ink-soft); text-decoration: line-through; }
+  #tifton-tracker .ih-delta { font-size: 11.5px; font-weight: 600; margin-left: 4px; }
+  #tifton-tracker .ih-delta.slip { color: var(--rust); }
+  #tifton-tracker .ih-delta.pullin { color: var(--teal); }
   #tifton-tracker .field { margin-bottom: 12px; }
   #tifton-tracker .field label { display: block; font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); margin-bottom: 4px; }
   #tifton-tracker .field input, #tifton-tracker .field select, #tifton-tracker .field textarea {
@@ -1512,6 +1539,201 @@
         </table>
       </div>
     `;
+  }
+
+  // ---------- Per-issue history (shown from the edit modal) ----------
+  //
+  // An issue's history is rebuilt from two sources, merged in time order:
+  //   1. RAID log upload snapshots (raid_snapshots): each upload is a full
+  //      copy of every item, so comparing consecutive uploads shows what
+  //      changed. Only items with a DevOps # can be matched across uploads
+  //      (see isTrackableId), the same rule the History tab uses.
+  //   2. editLog: edits saved in this tracker's edit form. Each save
+  //      appends {at, changes:[{field, from, to}]} to the issue, and the
+  //      log is carried forward when a new RAID log is uploaded.
+  // Walking both in order against a running "known state" means an edit
+  // that a later upload also reflects is only shown once.
+  const HISTORY_FIELDS = [
+    { key: 'status',      label: 'Status' },
+    { key: 'targetDate',  label: 'Target (UAT) date', isDate: true },
+    { key: 'scopingDate', label: 'Scoping date', isDate: true },
+    { key: 'owner',       label: 'Owner' },
+    { key: 'priority',    label: 'Priority' },
+    { key: 'blocker',     label: 'Walmart blocker' },
+  ];
+  const EDIT_LOG_MAX = 200;
+
+  function historyValueLabel(field, v) {
+    if (v == null || v === '') return field.isDate ? 'No date' : '—';
+    if (field.key === 'status') return STATUS_LABELS[v] || v;
+    if (field.isDate) return formatDate(v);
+    return String(v);
+  }
+
+  function daysBetweenIso(fromIso, toIso) {
+    const [fy, fm, fd] = fromIso.split('-').map(Number);
+    const [ty, tm, td] = toIso.split('-').map(Number);
+    return Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / 86400000);
+  }
+
+  function pickHistoryFields(item) {
+    const out = {};
+    HISTORY_FIELDS.forEach(f => { out[f.key] = item && item[f.key] != null ? String(item[f.key]) : ''; });
+    return out;
+  }
+
+  // Changes between two field sets, for the fields a user cares about.
+  function diffHistoryFields(before, after) {
+    const changes = [];
+    HISTORY_FIELDS.forEach(f => {
+      const a = before[f.key] || '';
+      const b = after[f.key] || '';
+      if (a !== b) changes.push({ field: f.key, from: a, to: b });
+    });
+    return changes;
+  }
+
+  // Snapshot details never change once saved, so they're cached by id.
+  const snapshotDetailCache = new Map();
+  async function loadAllSnapshotDetails() {
+    const res = await fetch('/api/snapshots');
+    if (!res.ok) throw new Error('Failed to load upload history: ' + res.status);
+    const list = (await res.json()).snapshots || [];
+    const missing = list.filter(s => !snapshotDetailCache.has(s.id));
+    const fetched = await Promise.all(missing.map(s =>
+      fetch('/api/snapshots/' + s.id).then(r => r.ok ? r.json() : null).catch(() => null)));
+    fetched.forEach((d, i) => { if (d) snapshotDetailCache.set(missing[i].id, d); });
+    return list
+      .map(s => snapshotDetailCache.get(s.id))
+      .filter(Boolean)
+      .sort((a, b) => String(a.uploadedAt).localeCompare(String(b.uploadedAt)));
+  }
+
+  function buildIssueTimeline(issue, snapshots) {
+    const trackable = isTrackableId(issue.id);
+    const steps = [];
+    if (trackable) {
+      snapshots.forEach(snap => {
+        const item = (snap.issues || []).find(i => i.id === issue.id) || null;
+        steps.push({ kind: 'upload', at: snap.uploadedAt, item });
+      });
+    }
+    (Array.isArray(issue.editLog) ? issue.editLog : []).forEach(e => {
+      steps.push({ kind: 'edit', at: e.at, changes: Array.isArray(e.changes) ? e.changes : [] });
+    });
+    steps.sort((a, b) => String(a.at).localeCompare(String(b.at)));
+
+    const events = [];
+    let known = null;
+    let absent = false;
+    steps.forEach(step => {
+      if (step.kind === 'upload') {
+        if (!step.item) {
+          if (known && !absent) events.push({ at: step.at, source: 'Upload', note: 'Not in this RAID log upload' });
+          if (known) absent = true;
+          return;
+        }
+        const state = pickHistoryFields(step.item);
+        if (!known) {
+          events.push({ at: step.at, source: 'Upload', note: 'First appeared in a RAID log upload', initial: state });
+        } else {
+          const changes = diffHistoryFields(known, state);
+          if (absent) events.push({ at: step.at, source: 'Upload', note: 'Back in the RAID log', changes });
+          else if (changes.length) events.push({ at: step.at, source: 'Upload', changes });
+        }
+        known = state;
+        absent = false;
+      } else {
+        if (!known) {
+          known = {};
+          HISTORY_FIELDS.forEach(f => { known[f.key] = ''; });
+          step.changes.forEach(c => { if (c.field in known) known[c.field] = c.from || ''; });
+        }
+        const real = step.changes.filter(c => (c.field in known) && (known[c.field] || '') !== (c.to || ''));
+        real.forEach(c => { known[c.field] = c.to || ''; });
+        if (real.length) events.push({ at: step.at, source: 'Tracker edit', changes: real });
+      }
+    });
+
+    // Anything the current card shows that the steps above don't explain
+    // (e.g. edits saved before edit history was recorded).
+    if (known) {
+      const leftover = diffHistoryFields(known, pickHistoryFields(issue));
+      if (leftover.length) events.push({ at: null, source: 'Tracker edit', note: 'Changed since the last recorded update (date not recorded)', changes: leftover });
+    }
+
+    // Summary of date movement and status changes.
+    let slips = 0, slipDays = 0, pullins = 0, statusChanges = 0;
+    events.forEach(ev => (ev.changes || []).forEach(c => {
+      if (c.field === 'status') statusChanges++;
+      if (c.field === 'targetDate' && isIsoDate(c.from) && isIsoDate(c.to)) {
+        const d = daysBetweenIso(c.from, c.to);
+        if (d > 0) { slips++; slipDays += d; ev.slip = true; }
+        else if (d < 0) pullins++;
+      }
+    }));
+    return { trackable, events, slips, slipDays, pullins, statusChanges };
+  }
+
+  function renderHistoryChange(c) {
+    const field = HISTORY_FIELDS.find(f => f.key === c.field) || { key: c.field, label: c.field };
+    let delta = '';
+    if (field.isDate && isIsoDate(c.from) && isIsoDate(c.to)) {
+      const d = daysBetweenIso(c.from, c.to);
+      if (d > 0) delta = `<span class="ih-delta slip">+${d} day${d === 1 ? '' : 's'} (pushed back)</span>`;
+      else if (d < 0) delta = `<span class="ih-delta pullin">${d} day${d === -1 ? '' : 's'} (pulled in)</span>`;
+    }
+    return `<div class="ih-change"><span class="ih-field">${esc(field.label)}:</span>
+      <span class="ih-old">${esc(historyValueLabel(field, c.from))}</span> &rarr;
+      <span>${esc(historyValueLabel(field, c.to))}</span>${delta}</div>`;
+  }
+
+  function renderIssueHistoryHtml(issue, t) {
+    const chips = [];
+    if (t.slips) chips.push(`<span class="ih-chip slip">Target date pushed back ${t.slips}&times; (+${t.slipDays} day${t.slipDays === 1 ? '' : 's'} total)</span>`);
+    else chips.push('<span class="ih-chip">No target date pushbacks</span>');
+    if (t.pullins) chips.push(`<span class="ih-chip">Pulled in ${t.pullins}&times;</span>`);
+    chips.push(`<span class="ih-chip">${t.statusChanges} status change${t.statusChanges === 1 ? '' : 's'}</span>`);
+
+    const note = t.trackable ? '' :
+      '<p class="issue-history-note">This item has no DevOps #, so it can\'t be matched across RAID log uploads. Only edits made in this tracker are shown.</p>';
+
+    if (!t.events.length) {
+      return `<div class="issue-history-title">History</div>${note}
+        <p class="issue-history-note">No recorded history yet. Changes will appear here after the next RAID log upload or tracker edit.</p>`;
+    }
+
+    const items = t.events.slice().reverse().map(ev => {
+      let body = '';
+      if (ev.note) body += `<div class="ih-change">${esc(ev.note)}</div>`;
+      if (ev.initial) {
+        body += `<div class="ih-change"><span class="ih-field">Status:</span> ${esc(historyValueLabel(HISTORY_FIELDS[0], ev.initial.status))}
+          &middot; <span class="ih-field">Target:</span> ${esc(historyValueLabel(HISTORY_FIELDS[1], ev.initial.targetDate))}</div>`;
+      }
+      (ev.changes || []).forEach(c => { body += renderHistoryChange(c); });
+      return `<li class="ih-event${ev.slip ? ' slip' : ''}">
+        <div class="ih-when"><span>${ev.at ? esc(formatDateTime(ev.at)) : 'Date not recorded'}</span><span class="ih-source">${esc(ev.source)}</span></div>
+        ${body}
+      </li>`;
+    }).join('');
+
+    return `<div class="issue-history-title">History <span style="font-weight:400;color:var(--ink-soft);">(${t.events.length} event${t.events.length === 1 ? '' : 's'})</span></div>
+      <div class="issue-history-summary">${chips.join('')}</div>
+      ${note}
+      <ul class="ih-list">${items}</ul>`;
+  }
+
+  async function showIssueHistory(container, issue) {
+    container.innerHTML = '<p class="issue-history-note">Loading history&hellip;</p>';
+    let snapshots = [];
+    let loadError = false;
+    if (isTrackableId(issue.id)) {
+      try { snapshots = await loadAllSnapshotDetails(); }
+      catch (e) { loadError = true; console.error(e); }
+    }
+    if (!container.isConnected) return; // modal closed while loading
+    container.innerHTML = renderIssueHistoryHtml(issue, buildIssueTimeline(issue, snapshots)) +
+      (loadError ? '<p class="issue-history-note">Upload history couldn\'t be loaded, so only tracker edits are shown.</p>' : '');
   }
 
   // ---------- FDD (Functional Design Document) tracker ----------
@@ -3172,6 +3394,12 @@
             await saveSnapshot(transformed, snapshotIso);
             if (currentView === 'history') loadAndRenderHistory();
           } else {
+            // Keep each item's tracker-edit history across the replace,
+            // matched on the same DevOps-based id the History tab uses.
+            const priorLogs = new Map(issues
+              .filter(i => isTrackableId(i.id) && Array.isArray(i.editLog) && i.editLog.length)
+              .map(i => [i.id, i.editLog]));
+            transformed.forEach(t => { if (priorLogs.has(t.id)) t.editLog = priorLogs.get(t.id); });
             issues = transformed;
             await saveIssues(snapshotDate);
             await saveSnapshot(issues, snapshotIso);
@@ -3589,7 +3817,11 @@
     backdrop.className = 'modal-backdrop';
     backdrop.innerHTML = `
       <div class="modal">
-        <h2>${id ? 'Edit issue' : 'Add issue'}</h2>
+        <div class="modal-head">
+          <h2>${id ? 'Edit issue' : 'Add issue'}</h2>
+          ${id ? '<button type="button" class="btn-history" id="m-history-btn">View history</button>' : ''}
+        </div>
+        ${id ? '<div class="issue-history" id="m-history" style="display:none;"></div>' : ''}
         <div class="field"><label>Owner</label><input type="text" id="m-owner" value="${issue.owner||''}" placeholder="optional"></div>
         <div class="field"><label>Title</label><input type="text" id="m-title" value="${issue.title}" placeholder="Short summary"></div>
         <div class="field"><label>Detail</label><textarea id="m-detail" placeholder="Full description">${issue.detail}</textarea></div>
@@ -3640,6 +3872,15 @@
     backdrop.addEventListener('click', (e) => { if (e.target === backdrop) backdrop.remove(); });
     document.getElementById('m-cancel').addEventListener('click', () => backdrop.remove());
     if (id) {
+      const historyBtn = document.getElementById('m-history-btn');
+      const historyBox = document.getElementById('m-history');
+      historyBtn.addEventListener('click', () => {
+        const opening = historyBox.style.display === 'none';
+        historyBox.style.display = opening ? '' : 'none';
+        historyBtn.textContent = opening ? 'Hide history' : 'View history';
+        historyBtn.classList.toggle('active', opening);
+        if (opening) showIssueHistory(historyBox, issue);
+      });
       document.getElementById('m-delete').addEventListener('click', async () => {
         issues = issues.filter(i => i.id !== id);
         await saveIssues();
@@ -3668,7 +3909,10 @@
       if (!data.title) { document.getElementById('m-title').focus(); return; }
       if (id) {
         const idx = issues.findIndex(i => i.id === id);
-        issues[idx] = { ...issues[idx], ...data };
+        const changes = diffHistoryFields(pickHistoryFields(issues[idx]), pickHistoryFields({ ...issues[idx], ...data }));
+        const editLog = Array.isArray(issues[idx].editLog) ? issues[idx].editLog.slice() : [];
+        if (changes.length) editLog.push({ at: new Date().toISOString(), changes });
+        issues[idx] = { ...issues[idx], ...data, editLog: editLog.slice(-EDIT_LOG_MAX) };
       } else {
         data.id = 'issue-' + Date.now();
         issues.push(data);
