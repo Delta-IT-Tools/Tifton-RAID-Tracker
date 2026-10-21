@@ -48,8 +48,3 @@ database_id = "32d6b303-e8ed-477d-8b40-43b485d9a337"
 binding = "SITE_PASSWORD"
 store_id = "73a9bf3c60b640c0889b9e4f2ffc69c1"
 secret_name = "RAID-PASSWORD"
-
-[[secrets_store_secrets]]
-binding = "SESSION_SECRET"
-store_id = "73a9bf3c60b640c0889b9e4f2ffc69c1"
-secret_name = "RAID_SESSION"
