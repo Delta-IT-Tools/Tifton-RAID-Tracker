@@ -52,4 +52,4 @@ secret_name = "RAID-PASSWORD"
 [[secrets_store_secrets]]
 binding = "SESSION_SECRET"
 store_id = "73a9bf3c60b640c0889b9e4f2ffc69c1"
-secret_name = "RAID_SESSIONS"
+secret_name = "RAID_SESSION"
