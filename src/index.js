@@ -15,10 +15,11 @@
 // did is preserved here, just combined into one script with manual
 // routing instead of Pages' file-based routing.
 //
-// Secrets used (set via the Cloudflare dashboard → this Worker → Settings
-// → Variables and Secrets → Encrypt — never commit them):
+// Secret used (Cloudflare Secrets Store binding in wrangler.toml; the value
+// lives in the dashboard, never in git):
 //   SITE_PASSWORD   — the shared password for the tool
-//   SESSION_SECRET  — a random string used to sign session cookies
+//   SESSION_SECRET  — optional; if absent, the cookie-signing key is
+//                     derived from SITE_PASSWORD
 // Binding used (declared in wrangler.toml, not sensitive):
 //   DB              — the D1 database storing the shared issue list
 //   ASSETS          — the static files in public/ (wired up automatically
@@ -148,9 +149,20 @@ async function resolveSecret(value) {
   return "";
 }
 
+// Cookie-signing key. Uses SESSION_SECRET if one is bound; otherwise it is
+// derived from SITE_PASSWORD, so the site needs only the one secret.
+// Anyone who could forge a cookie with this key already knows the
+// password, and changing the password logs everyone out.
+async function getSessionSecret(env, sitePassword) {
+  const explicit = await resolveSecret(env.SESSION_SECRET);
+  if (explicit) return explicit;
+  if (!sitePassword) return "";
+  return await hmac(sitePassword, "tifton-raid-tracker:session-signing-key");
+}
+
 async function isAuthenticated(request, env) {
   const sitePassword = await resolveSecret(env.SITE_PASSWORD);
-  const sessionSecret = await resolveSecret(env.SESSION_SECRET);
+  const sessionSecret = await getSessionSecret(env, sitePassword);
   if (!sitePassword || !sessionSecret) {
     // Secrets not configured yet — fail closed (show login) rather than
     // silently letting everyone through.
@@ -174,10 +186,10 @@ async function isAuthenticated(request, env) {
 
 async function handleLoginPost(request, env) {
   const sitePassword = await resolveSecret(env.SITE_PASSWORD);
-  const sessionSecret = await resolveSecret(env.SESSION_SECRET);
+  const sessionSecret = await getSessionSecret(env, sitePassword);
   if (!sitePassword || !sessionSecret) {
     return new Response(
-      "Server is missing SITE_PASSWORD / SESSION_SECRET. Set them in this Worker's Settings → Variables and Secrets.",
+      "Server is missing SITE_PASSWORD. Check the Secrets Store binding in wrangler.toml.",
       { status: 500 }
     );
   }
