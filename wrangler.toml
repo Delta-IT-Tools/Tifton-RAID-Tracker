@@ -2,45 +2,54 @@ name = "tifton-raid-tracker"
 main = "src/index.js"
 compatibility_date = "2026-09-08"
 
-# Tells Wrangler to leave dashboard-configured vars/secrets alone on every
-# deploy, instead of wiping them. Without this, SITE_PASSWORD and
-# SESSION_SECRET (set via the dashboard, see below) get cleared on every
-# push through the GitHub -> Workers Builds pipeline — a known Cloudflare
-# behavior (workers-sdk issue #8871), not something specific to this repo.
-# This must be a top-level key (not inside any [env.x] block).
+# Leaves any plain-text vars added in the dashboard alone on deploy.
+# SITE_PASSWORD and SESSION_SECRET no longer depend on this: they live in
+# Cloudflare Secrets Store (see the bottom of this file).
 keep_vars = true
 
 # Serves public/index.html and any other static files in that folder.
 # The "ASSETS" name here matches env.ASSETS used in src/index.js.
 #
-# run_worker_first = true is essential here, not optional: by default
-# Cloudflare serves a matching static file directly and skips the Worker
-# entirely, which would mean the password gate never runs for the main
-# page. This forces every request through src/index.js first, so the
-# auth check always happens before any static file is served.
+# run_worker_first = true is essential, not optional: by default
+# Cloudflare serves a matching static file directly and skips the Worker,
+# which would mean the password gate never runs for the main page. This
+# forces every request through src/index.js first, so the auth check
+# always happens before any static file is served.
 [assets]
 directory = "public"
 binding = "ASSETS"
 run_worker_first = true
 
-# D1 database binding — this is NOT sensitive (it's just an ID, like a
-# resource name), so it's safe to commit and belongs here. See README.md
-# for how to create the database and fill in the real database_id below
-# (all done via the Cloudflare dashboard — no CLI needed).
+# D1 database binding. Not sensitive (it's an ID, like a resource name),
+# so it's safe to commit.
 [[d1_databases]]
 binding = "DB"
 database_name = "tifton-golive-tracker-db"
 database_id = "32d6b303-e8ed-477d-8b40-43b485d9a337"
 
-# SITE_PASSWORD and SESSION_SECRET are intentionally NOT declared here.
+# SITE_PASSWORD and SESSION_SECRET come from Cloudflare Secrets Store.
 #
-# Set them via the Cloudflare dashboard: this Worker -> Settings ->
-# Variables and Secrets -> Add -> toggle "Encrypt". With keep_vars = true
-# above, they'll persist across every future deployment instead of being
-# cleared on each push — that clearing was a real bug in how Cloudflare's
-# GitHub integration handles dashboard secrets by default, not expected
-# behavior, and this setting is the documented fix for it.
+# The secret VALUES live in the dashboard (Secrets Store), never in git.
+# These blocks only point the Worker at them, so every deploy recreates
+# the bindings instead of wiping them. src/index.js reads them through
+# resolveSecret(), which calls .get() on Secrets Store bindings.
 #
-# Putting the actual secret VALUES in this file would also mean committing
-# your password and signing key to git — exactly what secrets are meant to
-# avoid. See README.md for the full walkthrough (browser only, no terminal).
+# Setup (one time):
+#   1. Dashboard -> Secrets Store -> create SITE_PASSWORD and
+#      SESSION_SECRET with scope "Workers".
+#   2. Copy the Store ID from that page into both store_id lines below.
+#      (The Store ID is an identifier, not a secret; safe to commit.)
+#   3. Delete any SITE_PASSWORD / SESSION_SECRET entries under this
+#      Worker's Settings -> Variables and Secrets, so the names don't
+#      collide with these bindings.
+#
+# To change the password later, edit it in Secrets Store. No redeploy needed.
+[[secrets_store_secrets]]
+binding = "SITE_PASSWORD"
+store_id = "PASTE_STORE_ID_HERE"
+secret_name = "SITE_PASSWORD"
+
+[[secrets_store_secrets]]
+binding = "SESSION_SECRET"
+store_id = "PASTE_STORE_ID_HERE"
+secret_name = "SESSION_SECRET"
