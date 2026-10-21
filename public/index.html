@@ -707,7 +707,9 @@
     padding-bottom: 8px;
     margin-bottom: 14px;
   }
-  #tifton-tracker .closed-header .count { font-weight: 400; color: rgba(243,241,234,0.75); }
+  #tifton-tracker .closed-header .count { font-weight: 400; color: var(--ink-soft); }
+  #tifton-tracker .closed-header.monitoring-header { color: var(--plum); border-bottom-color: var(--plum); }
+  #tifton-tracker .closed-header.onhold-header { color: var(--forest); border-bottom-color: var(--forest); }
 
 
   /* FDD view */
@@ -949,6 +951,8 @@
       <button data-view="history">History</button>
       <button data-view="calendar">Calendar</button>
       <button data-view="table">Table</button>
+      <button data-view="monitoring">Monitoring</button>
+      <button data-view="onhold">On Hold</button>
       <button data-view="closed">Closed</button>
     </div>
     <div class="as-of-nav" id="as-of-nav"></div>
@@ -1468,6 +1472,42 @@
           ${issueTableHead()}
           <tbody>
             ${closed.map(issueTableRow).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  // Monitoring tab: every item currently in Monitoring status (respecting
+  // the active filters), laid out like the Closed tab.
+  function renderMonitoringList(list) {
+    const monitoring = list.filter(i => i.status === 'monitoring').sort((a,b) => a.title.localeCompare(b.title));
+    if (!monitoring.length) return '<div class="empty">No monitoring issues match these filters.</div>';
+    return `
+      <div class="closed-wrap">
+        <div class="closed-header monitoring-header">Monitoring <span class="count">(${monitoring.length})</span></div>
+        <table>
+          ${issueTableHead()}
+          <tbody>
+            ${monitoring.map(issueTableRow).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  // On Hold tab: every item currently in On Hold status (respecting the
+  // active filters), laid out like the Monitoring and Closed tabs.
+  function renderOnHoldList(list) {
+    const onHold = list.filter(i => i.status === 'onhold').sort((a,b) => a.title.localeCompare(b.title));
+    if (!onHold.length) return '<div class="empty">No on hold issues match these filters.</div>';
+    return `
+      <div class="closed-wrap">
+        <div class="closed-header onhold-header">On Hold <span class="count">(${onHold.length})</span></div>
+        <table>
+          ${issueTableHead()}
+          <tbody>
+            ${onHold.map(issueTableRow).join('')}
           </tbody>
         </table>
       </div>
@@ -2449,6 +2489,8 @@
     else if (currentView === 'table') body.innerHTML = renderTable(list);
     else if (currentView === 'calendar') body.innerHTML = renderCalendar(list);
     else if (currentView === 'closed') body.innerHTML = renderClosedList(list);
+    else if (currentView === 'monitoring') body.innerHTML = renderMonitoringList(list);
+    else if (currentView === 'onhold') body.innerHTML = renderOnHoldList(list);
     else if (currentView === 'fdd') {
       body.innerHTML = '<div class="empty">Loading FDD documents&hellip;</div>';
       loadAndRenderFddView(list);
@@ -3274,8 +3316,18 @@
     return STATUS_LABELS[status] || status;
   }
 
-  function buildCopyText() {
+  // Single-status tabs (Monitoring, On Hold, Closed) copy only the items
+  // shown on that tab; every other view copies the full filtered list.
+  function getCopyList() {
     const list = getFiltered();
+    if (currentView === 'closed' || currentView === 'monitoring' || currentView === 'onhold') {
+      return list.filter(i => i.status === currentView);
+    }
+    return list;
+  }
+
+  function buildCopyText() {
+    const list = getCopyList();
     const header = `TIFTON GO-LIVE TRACKER\nGenerated ${todayLabel()}\n${list.length} issue(s)\n`;
 
     if (!list.length) return header + '\nNo issues match the current filters.';
@@ -3365,7 +3417,7 @@
   }
 
   function buildCopyHtml() {
-    const list = getFiltered();
+    const list = getCopyList();
     const font = "font-family:Arial,Helvetica,sans-serif;";
     const headerHtml = `
       <div style="${font}margin-bottom:14px;">
