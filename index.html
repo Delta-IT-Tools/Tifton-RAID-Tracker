@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TIFTON Go-Live Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   #tifton-tracker {
     --ink: #1b2027;
@@ -24,6 +25,10 @@
     --slate-bg: #eceae2;
     --teal: #1f7a72;
     --teal-bg: #daf0ee;
+    --plum: #6b4fa0;
+    --plum-bg: #f2ecfb;
+    --forest: #2f6b3a;
+    --forest-bg: #e2f0e4;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     color: var(--ink);
     background: linear-gradient(180deg, #9AC6E2 0%, #263138 100%);
@@ -34,6 +39,7 @@
   }
   #tifton-tracker * { box-sizing: border-box; }
   #tifton-tracker .head {
+    position: relative;
     padding: 22px 24px 18px;
     background-color: #334249;
     border-radius: 10px 10px 0 0;
@@ -43,6 +49,62 @@
     align-items: flex-end;
     gap: 16px;
     flex-wrap: wrap;
+  }
+  #tifton-tracker .head-brand {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  #tifton-tracker .head-logo {
+    height: 100px;
+    width: auto;
+    display: block;
+    flex-shrink: 0;
+  }
+  #tifton-tracker .nav-row {
+    padding: 14px 24px;
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 28px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid rgba(255,255,255,0.25);
+    background: rgba(255,255,255,0.12);
+  }
+  #tifton-tracker .nav-filters {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  #tifton-tracker .nav-filters select {
+    width: 150px;
+  }
+  #tifton-tracker .nav-filters #filter-missing {
+    width: 170px;
+  }
+  #tifton-tracker .nav-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-left: auto;
+  }
+  #tifton-tracker #search {
+    max-width: 210px;
+  }
+  #tifton-tracker .as-of-nav {
+    font-family: 'Oswald', sans-serif;
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: var(--rust);
+  }
+  #tifton-tracker .as-of-nav-empty {
+    color: var(--ink-soft);
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: normal;
+    font-size: 14px;
   }
   #tifton-tracker .eyebrow {
     font-family: 'Oswald', 'Arial Narrow', sans-serif;
@@ -68,62 +130,92 @@
   }
   #tifton-tracker .stat-row {
     display: flex;
-    gap: 0;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    overflow: hidden;
-    background: var(--panel);
+    gap: 34px;
   }
   #tifton-tracker .stat {
-    padding: 8px 16px;
     text-align: center;
-    border-right: 1px solid var(--line);
-    min-width: 74px;
+    min-width: 60px;
   }
-  #tifton-tracker .stat:last-child { border-right: none; }
-  #tifton-tracker .stat .n { font-family: 'Oswald', sans-serif; font-size: 20px; font-weight: 600; line-height: 1; }
-  #tifton-tracker .stat .l { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); margin-top: 3px; }
-  #tifton-tracker .stat.open .n { color: var(--rust); }
-  #tifton-tracker .stat.inprogress .n { color: var(--amber); }
-  #tifton-tracker .stat.testing .n { color: var(--steel); }
-  #tifton-tracker .stat.readyinstall .n { color: var(--slate); }
-  #tifton-tracker .stat.readycustomer .n { color: var(--moss); }
-  #tifton-tracker .stat.completed .n { color: var(--teal); }
+  #tifton-tracker .stat .n { font-family: 'Oswald', sans-serif; font-size: 34px; font-weight: 700; line-height: 1; color: #f3f1ea; }
+  #tifton-tracker .stat .l { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.06em; color: rgba(243,241,234,0.75); margin-top: 4px; }
+  #tifton-tracker .stat.late-stat {
+    cursor: pointer;
+    border-bottom: 2px solid var(--amber);
+    padding-bottom: 4px;
+  }
+  #tifton-tracker .stat.late-stat:hover .n, #tifton-tracker .stat.late-stat:hover .l { color: var(--amber); }
+  #tifton-tracker .stat.late-stat.active .n, #tifton-tracker .stat.late-stat.active .l { color: var(--amber); }
+  #tifton-tracker .stat.scoping-stat {
+    cursor: pointer;
+    border-bottom: 2px solid #b9a3e0;
+    padding-bottom: 4px;
+  }
+  #tifton-tracker .stat.scoping-stat:hover .n, #tifton-tracker .stat.scoping-stat:hover .l { color: #cdb9f0; }
+  #tifton-tracker .stat.scoping-stat.active .n, #tifton-tracker .stat.scoping-stat.active .l { color: #cdb9f0; }
   #tifton-tracker .stat.blocker-stat {
     cursor: pointer;
-    background: var(--rust-bg);
-    border-left: 2px solid var(--rust);
+    border-bottom: 2px solid var(--rust);
+    padding-bottom: 4px;
   }
-  #tifton-tracker .stat.blocker-stat .n { color: var(--rust); }
-  #tifton-tracker .stat.blocker-stat .l { color: var(--rust); font-weight: 600; }
-  #tifton-tracker .stat.blocker-stat:hover { background: #f4d9d3; }
-  #tifton-tracker .stat.blocker-stat.active { background: var(--rust); }
-  #tifton-tracker .stat.blocker-stat.active .n,
-  #tifton-tracker .stat.blocker-stat.active .l { color: white; }
+  #tifton-tracker .stat.blocker-stat:hover .n, #tifton-tracker .stat.blocker-stat:hover .l { color: var(--rust); }
+  #tifton-tracker .stat.blocker-stat.active .n, #tifton-tracker .stat.blocker-stat.active .l { color: var(--rust); }
 
   #tifton-tracker .toolbar {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    padding: 14px 24px;
-    border-bottom: 1px solid rgba(255,255,255,0.25);
+    padding: 0 24px;
     background: rgba(255,255,255,0.12);
   }
-  #tifton-tracker .toolbar-filters {
+  #tifton-tracker .active-filters:empty { display: none; }
+  #tifton-tracker .active-filters:not(:empty) { padding: 10px 0; }
+  #tifton-tracker .active-filters {
+    flex: 1;
     display: flex;
-    gap: 8px;
     align-items: center;
+    gap: 6px;
     flex-wrap: wrap;
-    justify-content: space-between;
+    min-width: 0;
   }
-  #tifton-tracker .toolbar-filters > * { flex: 1 1 0; min-width: 0; }
-  #tifton-tracker .toolbar-search {
-    display: flex;
+  #tifton-tracker .filter-chip {
+    display: inline-flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 12px;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--steel);
+    background: var(--steel-bg);
+    border-radius: 999px;
+    padding: 4px 6px 4px 10px;
+    white-space: nowrap;
   }
-  #tifton-tracker select, #tifton-tracker input[type=text] {
+  #tifton-tracker .filter-chip.late-chip { color: var(--amber); background: var(--amber-bg); }
+  #tifton-tracker .filter-chip.scoping-chip { color: var(--plum); background: var(--plum-bg); }
+  #tifton-tracker .filter-chip-x {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+    padding: 0;
+  }
+  #tifton-tracker .filter-chip-x:hover { background: rgba(0,0,0,0.12); }
+  #tifton-tracker select {
+    font-family: inherit;
+    font-size: 11.5px;
+    padding: 4px 7px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--panel);
+    color: var(--ink);
+  }
+  #tifton-tracker input[type=text] {
     font-family: inherit;
     font-size: 13px;
     padding: 7px 10px;
@@ -139,13 +231,12 @@
     border: 1px solid var(--ink);
     border-radius: 6px;
     overflow: hidden;
-    margin-left: auto;
   }
   #tifton-tracker .view-toggle button {
     font-family: inherit;
-    font-size: 12.5px;
+    font-size: 15.5px;
     font-weight: 600;
-    padding: 7px 12px;
+    padding: 12px 20px;
     border: none;
     border-right: 1px solid #d5d5d5;
     background: var(--panel);
@@ -154,18 +245,6 @@
   }
   #tifton-tracker .view-toggle button:last-child { border-right: none; }
   #tifton-tracker .view-toggle button.active { background: var(--ink); color: var(--paper); border-right-color: var(--ink); }
-  #tifton-tracker .btn-add {
-    font-family: inherit;
-    font-size: 13px;
-    font-weight: 600;
-    padding: 8px 14px;
-    border: none;
-    border-radius: 6px;
-    background: var(--steel);
-    color: white;
-    cursor: pointer;
-  }
-  #tifton-tracker .btn-add:hover { background: var(--steel-dark); }
   #tifton-tracker .btn-copy {
     font-family: inherit;
     font-size: 13px;
@@ -180,6 +259,29 @@
   }
   #tifton-tracker .btn-copy:hover { background: var(--ink); color: var(--paper); }
   #tifton-tracker .btn-copy.copied { background: var(--moss); border-color: var(--moss); color: white; }
+  #tifton-tracker .head-actions {
+    position: absolute;
+    top: 16px;
+    right: 24px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  #tifton-tracker .btn-copy-header {
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 5px 10px;
+    border: 1px solid rgba(243,241,234,0.5);
+    border-radius: 6px;
+    background: transparent;
+    color: rgba(243,241,234,0.9);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  #tifton-tracker .btn-copy-header:hover { background: rgba(243,241,234,0.15); border-color: rgba(243,241,234,0.8); color: #f3f1ea; }
+  #tifton-tracker .btn-copy-header.copied { background: var(--moss); border-color: var(--moss); color: white; }
 
   #tifton-tracker .data-io {
     display: flex;
@@ -198,8 +300,10 @@
     border-radius: 6px;
     background: transparent;
     color: rgba(243,241,234,0.85);
+    white-space: nowrap;
     cursor: pointer;
   }
+  #tifton-tracker .head-actions .btn-io { font-size: 11px; padding: 5px 10px; }
   #tifton-tracker .btn-io:hover { background: rgba(243,241,234,0.12); border-color: rgba(243,241,234,0.8); color: #f3f1ea; }
   #tifton-tracker .logout-row { text-align: center; padding: 0 24px 16px; }
   #tifton-tracker .logout-link { font-size: 11.5px; color: rgba(243,241,234,0.55); text-decoration: none; }
@@ -333,10 +437,13 @@
   #tifton-tracker .card.open { border-left-color: var(--rust); }
   #tifton-tracker .card.inprogress { border-left-color: var(--amber); }
   #tifton-tracker .card.testing { border-left-color: var(--steel); }
-  #tifton-tracker .card.readyinstall { border-left-color: var(--slate); }
   #tifton-tracker .card.readycustomer { border-left-color: var(--moss); }
-  #tifton-tracker .card.completed { border-left-color: var(--teal); }
-  #tifton-tracker .card-top { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+  #tifton-tracker .card.readyinstall { border-left-color: var(--slate); }
+  #tifton-tracker .card.monitoring { border-left-color: var(--plum); }
+  #tifton-tracker .card.onhold { border-left-color: var(--forest); }
+  #tifton-tracker .card.closed { border-left-color: var(--teal); }
+  #tifton-tracker .card-top { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 8px; margin-bottom: 6px; }
+  #tifton-tracker .card-tag-right { margin-left: auto; }
   #tifton-tracker .tag {
     font-size: 10.5px;
     font-weight: 600;
@@ -348,9 +455,9 @@
     border-radius: 4px;
     white-space: nowrap;
   }
-  #tifton-tracker .card-title { font-size: 13.5px; font-weight: 600; line-height: 1.3; margin-bottom: 3px; min-height: calc(1.3em * 2); }
+  #tifton-tracker .card-title { font-size: 15.5px; font-weight: 600; line-height: 1.3; margin-bottom: 3px; min-height: calc(1.3em * 2); }
   #tifton-tracker .blocker-tag {
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.03em;
@@ -360,11 +467,37 @@
     border-radius: 4px;
     white-space: nowrap;
   }
+  #tifton-tracker .card-tag-slot { display: flex; flex-wrap: wrap; gap: 4px; align-items: flex-start; }
+  #tifton-tracker .late-tag {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: white;
+    background: var(--amber);
+    padding: 2px 7px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  #tifton-tracker .scoping-late-tag {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: white;
+    background: var(--plum);
+    padding: 2px 7px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  #tifton-tracker .card.is-scoping-late { border-left-color: var(--plum); box-shadow: inset 0 0 0 1px var(--plum-bg); }
+  #tifton-tracker .card.is-late { border-left-color: var(--amber); box-shadow: inset 0 0 0 1px var(--amber-bg); }
   #tifton-tracker .meta-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+  #tifton-tracker .date-row { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; margin-bottom: 6px; }
   #tifton-tracker .devops-tag {
     display: inline-block;
     font-family: monospace;
-    font-size: 11px;
+    font-size: 12.5px;
     font-weight: 600;
     color: var(--steel-dark);
     background: #e4ebef;
@@ -374,25 +507,47 @@
   }
   #tifton-tracker .priority-tag {
     display: inline-block;
-    font-size: 10.5px;
+    font-size: 12px;
     font-weight: 600;
     border-radius: 4px;
     padding: 1px 7px;
+    background: var(--steel-bg);
+    color: var(--steel);
   }
   #tifton-tracker .priority-tag.high { background: var(--rust-bg); color: var(--rust); }
   #tifton-tracker .priority-tag.medium { background: var(--amber-bg); color: var(--amber); }
   #tifton-tracker .priority-tag.low { background: var(--slate-bg); color: var(--slate); }
   #tifton-tracker .target-tag {
     display: inline-block;
-    font-size: 10.5px;
+    font-size: 12px;
     font-weight: 600;
     color: var(--steel-dark);
     background: #e4ebef;
     border-radius: 4px;
     padding: 1px 7px;
   }
-  #tifton-tracker .card-detail {
+  #tifton-tracker .target-tag.target-tag-late {
+    color: var(--rust);
+    background: var(--rust-bg);
+    font-weight: 700;
+  }
+  #tifton-tracker .scoping-tag {
+    display: inline-block;
     font-size: 12px;
+    font-weight: 600;
+    color: var(--plum);
+    background: var(--plum-bg);
+    border-radius: 4px;
+    padding: 1px 7px;
+  }
+  #tifton-tracker .scoping-tag.scoping-tag-late {
+    color: white;
+    background: var(--plum);
+    font-weight: 700;
+  }
+  #tifton-tracker .date-tbd { opacity: 0.7; font-weight: 500; }
+  #tifton-tracker .card-detail {
+    font-size: 13.5px;
     color: var(--ink-soft);
     line-height: 1.4;
     display: -webkit-box;
@@ -401,7 +556,7 @@
     overflow: hidden;
     min-height: calc(1.4em * 3);
   }
-  #tifton-tracker .card-reported { font-size: 10.5px; color: var(--ink-soft); margin-top: 2px; }
+  #tifton-tracker .card-reported { font-size: 11.5px; color: var(--ink-soft); margin-top: 2px; }
   #tifton-tracker .card-footer {
     display: flex;
     justify-content: space-between;
@@ -419,9 +574,9 @@
     font-size: 11.5px;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: #f3f1ea;
+    color: var(--ink);
     padding: 8px 10px;
-    border-bottom: 2px solid rgba(243,241,234,0.55);
+    border-bottom: 2px solid var(--ink);
   }
   #tifton-tracker tbody tr { background: rgba(255,255,255,0.9); }
   #tifton-tracker tbody td { padding: 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
@@ -437,9 +592,11 @@
   #tifton-tracker .status-pill.open { background: var(--rust-bg); color: var(--rust); }
   #tifton-tracker .status-pill.inprogress { background: var(--amber-bg); color: var(--amber); }
   #tifton-tracker .status-pill.testing { background: var(--steel-bg); color: var(--steel); }
-  #tifton-tracker .status-pill.readyinstall { background: var(--slate-bg); color: var(--slate); }
   #tifton-tracker .status-pill.readycustomer { background: var(--moss-bg); color: var(--moss); }
-  #tifton-tracker .status-pill.completed { background: var(--teal-bg); color: var(--teal); }
+  #tifton-tracker .status-pill.readyinstall { background: var(--slate-bg); color: var(--slate); }
+  #tifton-tracker .status-pill.monitoring { background: var(--plum-bg); color: var(--plum); }
+  #tifton-tracker .status-pill.onhold { background: var(--forest-bg); color: var(--forest); }
+  #tifton-tracker .status-pill.closed { background: var(--teal-bg); color: var(--teal); }
 
   #tifton-tracker .empty { text-align: center; padding: 40px 20px; color: rgba(243,241,234,0.75); font-size: 13px; }
 
@@ -543,13 +700,13 @@
   #tifton-tracker .cal-detail-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
 
   /* Completed view */
-  #tifton-tracker .completed-wrap {
+  #tifton-tracker .closed-wrap {
     background: var(--panel);
     border: 1px solid var(--line);
     border-radius: 8px;
     padding: 16px;
   }
-  #tifton-tracker .completed-header {
+  #tifton-tracker .closed-header {
     font-family: 'Oswald', sans-serif;
     font-size: 17px;
     font-weight: 600;
@@ -558,8 +715,187 @@
     padding-bottom: 8px;
     margin-bottom: 14px;
   }
-  #tifton-tracker .completed-header .count { font-weight: 400; color: rgba(243,241,234,0.75); }
-  #tifton-tracker .completed-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+  #tifton-tracker .closed-header .count { font-weight: 400; color: var(--ink-soft); }
+  #tifton-tracker .closed-header.monitoring-header { color: var(--plum); border-bottom-color: var(--plum); }
+  #tifton-tracker .closed-header.onhold-header { color: var(--forest); border-bottom-color: var(--forest); }
+
+
+  /* FDD view */
+  #tifton-tracker .fdd-table thead th {
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 700;
+  }
+  #tifton-tracker .fdd-row-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+  }
+  #tifton-tracker .fdd-row-upload-input {
+    font-size: 11.5px;
+    max-width: 190px;
+  }
+  #tifton-tracker .fdd-row-file-name {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink);
+    max-width: 100px;
+    flex-shrink: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  #tifton-tracker .fdd-row-file-size {
+    font-size: 11px;
+    color: var(--ink-soft);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  #tifton-tracker .fdd-row-view-btn {
+    padding: 4px 10px;
+    font-size: 12px;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  #tifton-tracker .fdd-row-remove-btn {
+    flex-shrink: 0;
+  }
+  #tifton-tracker .fdd-detail-row td {
+    padding: 12px;
+    background: var(--paper);
+    border-bottom: 1px solid var(--line);
+  }
+  #tifton-tracker .fdd-preview-frame {
+    width: 100%;
+    height: 60vh;
+    min-height: 360px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: white;
+  }
+
+  /* History view */
+  #tifton-tracker .history-wrap {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  #tifton-tracker .history-header {
+    font-family: 'Oswald', sans-serif;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--ink);
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 8px;
+    margin-bottom: 14px;
+  }
+  #tifton-tracker .history-header .count { font-weight: 400; color: var(--ink-soft); }
+  #tifton-tracker .history-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  #tifton-tracker .history-table thead th {
+    text-align: left;
+    font-family: 'Oswald', sans-serif;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ink-soft);
+    padding: 6px 10px;
+    border-bottom: 2px solid var(--line);
+  }
+  #tifton-tracker .history-table tbody td { padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  #tifton-tracker .history-delete-btn {
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: transparent;
+    color: var(--ink-soft);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 15px;
+    line-height: 1;
+  }
+  #tifton-tracker .history-delete-btn:hover { background: var(--rust-bg); color: var(--rust); }
+  #tifton-tracker .history-hint { font-size: 12.5px; color: var(--ink-soft); margin: -6px 0 12px; }
+
+  /* Analysis view */
+  #tifton-tracker .analysis-wrap { display: flex; flex-direction: column; gap: 16px; }
+  #tifton-tracker .analysis-chart-row { display: flex; gap: 16px; flex-wrap: wrap; }
+  #tifton-tracker .analysis-chart-row .analysis-card { flex: 1 1 320px; min-width: 0; margin-bottom: 0; }
+  #tifton-tracker .analysis-chart-row .analysis-card-pie { flex: 1 1 400px; max-width: 480px; }
+  #tifton-tracker .analysis-header {
+    font-family: 'Oswald', sans-serif;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  #tifton-tracker .analysis-header .count { font-weight: 400; color: var(--ink-soft); }
+  #tifton-tracker .analysis-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  #tifton-tracker .analysis-card-title {
+    font-family: 'Oswald', sans-serif;
+    font-size: 14.5px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 10px;
+  }
+  #tifton-tracker .analysis-card-title .count { font-weight: 400; color: var(--ink-soft); font-size: 13px; }
+  #tifton-tracker .chart-wrap { width: 100%; }
+  #tifton-tracker .chart-wrap-pie { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+  #tifton-tracker .chart-legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px; }
+  #tifton-tracker .chart-legend-side { flex-direction: column; flex-wrap: nowrap; gap: 9px; margin-top: 0; }
+  #tifton-tracker .chart-legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink); }
+  #tifton-tracker .chart-legend-swatch { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  #tifton-tracker .analysis-stat-row { display: flex; gap: 20px; flex-wrap: wrap; }
+  #tifton-tracker .analysis-stat { flex: 1; min-width: 140px; }
+  #tifton-tracker .analysis-stat-n { font-family: 'Oswald', sans-serif; font-size: 26px; font-weight: 700; color: var(--steel); }
+  #tifton-tracker .analysis-stat-l { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+  #tifton-tracker .stuck-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  #tifton-tracker .stuck-table thead th {
+    text-align: left;
+    font-family: 'Oswald', sans-serif;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ink-soft);
+    padding: 6px 10px;
+    border-bottom: 2px solid var(--line);
+  }
+  #tifton-tracker .stuck-table tbody td { padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  #tifton-tracker .stuck-table tbody tr { cursor: pointer; }
+  #tifton-tracker .stuck-table tbody tr:hover { background: var(--paper); }
+  #tifton-tracker .history-row.clickable { cursor: pointer; }
+  #tifton-tracker .history-row.clickable:hover { background: var(--paper); }
+  #tifton-tracker .history-row.expanded { background: var(--paper); }
+  #tifton-tracker .history-expand-caret {
+    display: inline-block;
+    width: 12px;
+    color: var(--ink-soft);
+    transition: transform 0.15s ease;
+  }
+  #tifton-tracker .history-row.expanded .history-expand-caret { transform: rotate(90deg); }
+  #tifton-tracker .history-detail-row td { padding: 0; border-bottom: 1px solid var(--line); }
+  #tifton-tracker .history-detail-row .history-diff-section { margin: 0; border-radius: 0; border-left: none; border-right: none; border-top: none; }
+  #tifton-tracker .history-diff-section {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 16px;
+  }
+  #tifton-tracker .history-diff-title { font-family: 'Oswald', sans-serif; font-size: 13.5px; font-weight: 600; color: var(--ink); margin-bottom: 4px; }
+  #tifton-tracker .history-diff-summary { font-size: 12.5px; color: var(--ink-soft); margin-bottom: 10px; }
+  #tifton-tracker .history-diff-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+  #tifton-tracker .history-diff-list:last-child { margin-bottom: 0; }
+  #tifton-tracker .history-diff-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; flex-wrap: wrap; }
+  #tifton-tracker .history-diff-arrow { color: var(--ink-soft); }
+  #tifton-tracker .history-diff-item-title { color: var(--ink); }
+  #tifton-tracker .status-pill.unmatched { background: var(--slate-bg); color: var(--slate); }
 
   /* Modal */
   #tifton-tracker .modal-backdrop {
@@ -572,6 +908,33 @@
     border: 1px solid var(--line);
   }
   #tifton-tracker .modal h2 { font-family: 'Oswald', sans-serif; font-size: 18px; margin: 0 0 14px; }
+  /* Per-issue history (inside the edit modal) */
+  #tifton-tracker .modal-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+  #tifton-tracker .modal-head h2 { margin: 0; }
+  #tifton-tracker .btn-history {
+    font-family: inherit; font-size: 12px; font-weight: 600; padding: 6px 10px;
+    border: 1px solid var(--line); border-radius: 6px; background: var(--paper); color: var(--steel); cursor: pointer;
+  }
+  #tifton-tracker .btn-history:hover, #tifton-tracker .btn-history.active { border-color: var(--steel); }
+  #tifton-tracker .issue-history { border: 1px solid var(--line); border-radius: 8px; background: var(--paper); padding: 12px 14px; margin-bottom: 14px; }
+  #tifton-tracker .issue-history-title { font-family: 'Oswald', sans-serif; font-size: 14px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
+  #tifton-tracker .issue-history-summary { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  #tifton-tracker .ih-chip { font-size: 11.5px; font-weight: 600; padding: 3px 8px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); color: var(--ink-soft); }
+  #tifton-tracker .ih-chip.slip { background: var(--rust-bg); border-color: transparent; color: var(--rust); }
+  #tifton-tracker .issue-history-note { font-size: 12px; color: var(--ink-soft); margin: 0 0 8px; }
+  #tifton-tracker .ih-list { list-style: none; margin: 0; padding: 0; max-height: 300px; overflow-y: auto; }
+  #tifton-tracker .ih-event { position: relative; padding: 0 0 10px 16px; border-left: 2px solid var(--line); margin-left: 4px; }
+  #tifton-tracker .ih-event:last-child { padding-bottom: 0; }
+  #tifton-tracker .ih-event::before { content: ""; position: absolute; left: -6px; top: 3px; width: 10px; height: 10px; border-radius: 50%; background: var(--steel); }
+  #tifton-tracker .ih-event.slip::before { background: var(--rust); }
+  #tifton-tracker .ih-when { font-size: 11.5px; color: var(--ink-soft); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  #tifton-tracker .ih-source { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 1px 6px; border-radius: 4px; background: var(--panel); border: 1px solid var(--line); }
+  #tifton-tracker .ih-change { font-size: 12.5px; color: var(--ink); margin-top: 2px; }
+  #tifton-tracker .ih-change .ih-field { font-weight: 600; }
+  #tifton-tracker .ih-change .ih-old { color: var(--ink-soft); text-decoration: line-through; }
+  #tifton-tracker .ih-delta { font-size: 11.5px; font-weight: 600; margin-left: 4px; }
+  #tifton-tracker .ih-delta.slip { color: var(--rust); }
+  #tifton-tracker .ih-delta.pullin { color: var(--teal); }
   #tifton-tracker .field { margin-bottom: 12px; }
   #tifton-tracker .field label { display: block; font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); margin-bottom: 4px; }
   #tifton-tracker .field input, #tifton-tracker .field select, #tifton-tracker .field textarea {
@@ -598,6 +961,7 @@
 
   @media (max-width: 480px) {
     #tifton-tracker .head { flex-direction: column; align-items: flex-start; }
+    #tifton-tracker .head-actions { position: static; justify-content: flex-start; }
   }
 </style>
 </head>
@@ -605,43 +969,58 @@
 
 <div id="tifton-tracker">
   <div class="head">
-    <div>
-      <p class="eyebrow">HY-TEK &middot; DELTA GALIL</p>
-      <h1>TIFTON Go-Live Tracker</h1>
-      <p class="head-sub" id="header-summary">Loading&hellip;</p>
+    <div class="head-brand">
+      <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAO4AAABKCAYAAAC8Y2jaAAAUaElEQVR4nO2de3RV1Z3HP8m9SW5IgkECAQxDgCjqRAUHHyBSpGrLchy1dTk4LjtjcSy0HbUz1FYtPsrIWEdbpcux6ox2Rkdt60y16jjiA1sqWhVkjVahPgCJvEQMJCE3LzJ/fPfuubncc+65rzxwf9a6K7n3nLPPPufs3/79zt6/328X9fb24nA4CkYF0JbvQovzXaDD4ejDBcBl+S7UCa7DUViiwD8CNwLV+SrUCa7DUVhagU3A2cAdwFH5KNQJrsNRWKJAN/Ae0ADcBZyXa6FOcB2OwtKNhLcI+BBoB24AlgEjsy3UCa7DUVg+MH9jSIBbzW9fAO4BpmVTqBNch6OwrDOfP0HyVgzsBzYAo5DpfHGmhRa5eVyHo+A0ALcAY4Am81sJ0IVGmmuA54DlCdsDcYLrcPQPdcDlwCzgE/SuG03YPgbYCdwOvJiuMCe4Dkf/UQZcBFxqvlvtagX4EKSJHwbuAzr8CnKC63D0PzOAbyETejMyma3wRpH2XYdGnjelKsAJrsMxMIwErgDORZq3BSg127qACUAPsBR4OvlgJ7gOx8ByIfBN8//2hN87kOYdAzwA/BhNJQFOcB2OwUAj8G3gGOAjoNP83gGUA5PwTOcN4ATX4RgsVACLgL9AYYBdSdtrkCl9B/CwE1yHY3BxJnANmi5KFN5OoAqYCdwZTXGgw+EYGBpvfvqr89/btba6LFJelrxxZ0tT3ZiKiW9cdMJ3VjmN63AMAp58/f5Lfv7Kj77VvT8eG1FVuyNxW1vnnkM6O+Kx2Uee/+jCM5fdBLQ5wXU4BpZxNz922Q2vb3z2jMrYiE+Hx6paenr2F0ci0e6enu5oU/MHk+qqJ30wf+biW089+pzH7UFOcB2OAeKVDU+d9ZMXlixt79o7vLZq/BaAnp7uaCQS7W7rbqna+unGiTMmzXv6uvMfXAJsTDzWCa7D0f9Ef/ri0qt/9urtVx5aMXrn6KrDPmprb6sAiJWWdn6yb+fofZ2tlReevPjWC2ZccSeK6e2DE1yHo39pvOrBs//pza2rZ44bMXHj8LLq5s7Ojj8ORO1oaaobV12/afklK28kINjACa7D0U+sevvxc+59YcnSfV0tVeOq6zdBX9N4155tY2c0nPXUd8+95wZga1BZTnAdjn7gP15Yds1/rb3zGzWHjN2WqGVLS8s6tjZvqo93tpdfdMpVt/iZxsk4wXU4Cswjv7118b2/vv7G+tFHvVMRrWrp6en+o/9E06fvT64dPmHzPV97+WpCxOFanOA6HIVl4l8tP+IZgJqqwz6yQhvvbS/f3bqjduaks5/49jn/ciOwI7CUJJznlMNRQJ5d99CMto7WyroRk98HiESi3TtatowvLxm+d+GcZdd8YdrFD2RTrhNch6OAfNr+8ajiaKQnEol2A2xpfq/h6LEn/e6m+Y/eALyVbblOcB2OAlIWKW8vjZR1fLJv+xiA845bdNdX5l7zQyCeS7nJghsznzIUQmQj8vegaIW8rzrmGBCqUaRJGYr53IeCtH1zHDmyI1Jc0rVl9weTjqidum7h3KVLTp5y1lP5KDcK1APzgHFALXqgFShplRXcNqAZRej/H7AGeCfDc9WgeMMqvN4m3cjYCHOufw/YZyRwJWqEMWAV8IuQdToNLQfRnKIuRUnfU9V1OPAM8L8hzlWNsvxVovv+Bsps0F8ciTIMHosyDlYmbIujZ7sJWGvqltFgSQJTgIWoMygHfkUGo6VJ1AB/h9piOfAS8GiWZV2GAtYB3gTuDXnceShHFOg+LQd2hT1p0+53D58y+vi19y96/ULg3bDHpSOK4v+uR0mrOuj7QC2jEv6fg3rnNcBD6CGHoRI4AzXgViRk5QQL73izf5DgDkNZ4WOoU2glvOA2ApfgZdtLrEtr0r6p7ksNylgQRnBnmHPtNt+nAivIXkDC0mDOOwNlEUy0suzyGCVmv1nA+cB64OuoQ8uUc9HSkptRu6kEfkuIuckUVKA2U4naSgvZC+50UxaonYQV3Ea0YBfI8ryPDAR34ZnLfrnwzGV3kOfnHEU944eoAQL8DtiGgng7kCarRr30RLz1Tk4CZgMPonw46eg25bbhBQnHgUjAMdtQIwqiC3mZlKIHvDt49z40Aa+Q+qYmx0O2m7+Jqz8cShoPlwRmo+vZYr6PAk4Engh5fDacjbIJxtC9tvfqHXTtcbPtEGAsSlB2FBLY5I4rDNXAnwFvAx+jBj4eWXXvZVFeD2qXFaaen2RRhmUX3r3fluVxrWTeAb2W4f6hiKKbsx811GLgTlKnhIwhwZ2HeuVW9HAuR5rn+hDn22/+1qDcsQ+Ycv0owROYoGuAA03bMKxAgpucJgTgOjzTar35noowgwx1SMPuQZoD1ABmUjjBvRhYjDRfHAnVw8BTpBaimKnnGcCrZKchp5kydqDOoAO9TszwOWcYitGzzXW5nCI8JZHJoGzUfOz7fzbtLO+kugA/QYqjnvod4NcobeRw9E50HhL2+0OcsxfdwC4k/Nn07PmijeABN7vWC2RgHqVgDjCavh1iFPhTYDLwfg5lp2IeSn+yAW+8YjGwOuCYOBKubAUM4HR0v7rMpwSlXJmJXl9yGkl1eKTqxcL0RmuAv0cPpwo1vAsIv2hvD3qog5kiPAshQrBlEEQUOAV1EOXAI0gjDUMd34m5VfMA6oGrkTlYgiypKwkW2nxQBxyPnm0EjX90mu8NwHEFPv9nilzMj/XoBb8WadFy8rBg7yAiX76gjWiktRuZW08gTWhH7Gdw4Pt0LixAZuouNB6xHKX2LDQno44I1DE9idbCiaLrO6Uf6vCZIdf3hhXIdK5Gg1zTUc/r8DgVadcyNB0QRwMW3UgjHUt4SyUd9cDn0IDOSOD3FHbwK5G5yAIrwru+t9G1dyHBznohZ0dfchXcNjS3Ngw1yBrg8FwrdRBRjQR3HzIfV5rf38YbqRyGGn0+mIVM+lZkAT1H/zhVHIXmiTvNuV82v69C7aIDdSon9ENdPhPkY2Hr9eg9Jooa58QQx0RQYz7YmYpngexEA3mg6ZZX8VYon4WEPFemIO1mhffNPJQZhtPNOUvR4JadwnsXvRbYEd18dVADyaAIp8uHr/KnSAhtWaPT7F+ENHUDeuDlSdsjaAojrGPHYMY21BiyTBLni18Dvog0Uh3SRs/mcK4YMkU70D1uJTsHikypQANscWQ9JA6CdSC/gEY0BzsdzRVv7od6FYpBOx2UKe14a50UcaAgJmLn0ZrRQ/w8qXuwCPKQuZ3s5hMHA7XoGluRY8hLSdvXIjdD+943l9wFtxzdrzI0Z5zt9Ms0U04YjX0sEsY4sBd5SSWyBpiPLIExaGpoKAvuoCAfpnJRwicstsPwMzuK0bzjBTnUa6A5EXlW9SABfT1pexwJbyUaAT6O/Azs9ZhPtvwtcjGdGnL/0/DM5N9zoPPOWyi1aAx12KfhotJyJh830E7wW63bErCvbVDVaKBmBf5TIRX0XXZwqDEXvUIMR+ZjKgeO1cCXkRCPQyOv2fridiPrJ4qexTAyn3u+EDn1t/jUN5kaNM1jfc9f9NnvZWQubweOMP+vy7BujgTyIbjjkJC1o8bzUfDu9CJhbULvPwcjk9Eoqx3R9ZuSWY/uw1j03n8K8BjZvR60ImFrNP9XIX/opqCDEqhEAQK7TV3CtI0TUARX3Jwn2Uy2vAp8xZRZjEba14WslyMF+RDcqQn/dwB/CHFMD9l7Ig0FZiJNuxtpr0Y0ZWKveTUabW1DndfFSBs1oum0TEMmLX9AA15dqDOdRvhBvhHI3G0n/CvUqUi7x5EZfCYanygxdXgeeXBtQKPNx6J37+mooxhId9chTa6CW4t63T3oYTWRf7/boUYZ8oaKm085CpGzxJA5+h00GLUKmagg83Y22Qvua+acFUgo5gA/J5yAdCEXzwjhNP4E1NHsRR32eOCKhO3lwF8id8v3gd+giLKdaMrwePObIwtyHZz6EhpQ2Ysay4v0zxTEYOYI1DDbkCBG0T2xnw+RlroSjSi/hbRRNbqPp5A69jcMG1C003g8s3l+lmWlYyaqcxyvvrsTPpvRK8M3zLYX0PXZDCufL1C9Cs2Qn8dtRJpiG3pw25F/6medWUjbRNC87W3I/CxN2KfL7NODtNsqNKq8C81vTzO/ZcN9SChGoPGGryMTOox2CzszEEWWVhua4nkJ+CmyupLLsFOAO5BFMBtZaDPQ4FYmUVdBsdv9xaCYx81W4zYAP0CNzj68+wgf6GzD+vJNBC+iZyCoRCPDncgCWYUGYTagOVH7WY/ePZvNcb9BjizWIX9ODnVYD9yKXAzjSDBuxsv+4Ee3+YRpmNbFsRd1SM+ga3yLvtf5Jn0HoV7A8xarRVND6SjC03LpYrP7g870uxSeTDVuNfJ2WoAaWDvSDssJl77FBkVbjVNNerPQaq4wzgR20GskBzqCJJqsheJ4ZKZa/9xXQx63AfkvN6L6zSRzbZTIw2hEeQHSus3AEtSpPIneoZPvZw26R2E61JPQc+tGpv+6kPVaizJwlKMO/zTSpxnqxQuxrDD1TDWw2U5uGTLCMgr/wdWwI/g5YwW3kwN7kmpkCtegmxxDvrDj8VLajAT+Gbgn5Pm6UcPYi0zKk8zvfpq/DL0nXoW/F4+NsilFZvtxwB0pyrTX+p/A46SnB11nL+Ed9acl/L+R9Gl3ElmFBH87GviZRm6eVMtRhpJvIkHZhQTlZPT+uQ019nI0dXQY3jVPQKGBqYiaetq0N2sI3xnuQJbGbNShHEn6RAId5jzbkXk+lQOfrR3Jfgj/eXAbVgmZBV5YS2Sv+f5d8ze5DjHUgd1GP2RDjaKHdgTqCaPogTQg75l6+vrXWuGuRo3yx3iRIGHONR41iFa8IO8gL59yNK0SpJVLTD2r0KBICf6WRDmKIR5O+gyL40y5ZWhKJ937VQOaq7ReRE+QmcvhajQq24DeTxfhRddky8PovXIBEpYY6ghH0vedOxHr6rjOZ/vpaMrJmq1hn7/lZaQQStDU10XA9332LUKdSDXSpokpg5MpB/7V/E31bMfhBcBsTLHdjxpznG2DQdOYZyDFsYACD9JGkdl0P16PsgtpVqsxyvCyVexB4WivoPeyTHquFuRcEKOvdg96J7XCHZTcy2b+s6Z7UJnd6N3KpkgNmvZ4FrnwlaBOLd0USRWat2w23/8nzf7JbEb5vg7HS/tyCLmne3kPZcRoQNp2CmrEia8S1nljCxLYtfg/2yLgZ8grbA9exFNYXgbuRh1hBbIK/J7FPuCXeKZ1EN14WSVTlbcSzxMvE0vodfQsrHz4ta0e1CmOQh1jcwbnyJh0i35V0reHcUnRDw6Sn2sc5wwxpHCr9TkcQ5B8RAc5HI5+xgmuwzEEcYLrcAxBnOA6HEMQJ7gOxxDECa7DMQRxgutwDEGc4DocQ5CByLY33vzd4rM9hvxTNyT8ZrMfBkVfNOL5om5Fzu9BTDB/barQSnOejfi7+0VRcMQI5EroF/gwGbkufozcO8ci98A1pHbtq0VpXSpN3dPl4qo35fjdj0q0EmCZ+dj8xn7XFUOhhJXIzTPbDBwg18o20q9Bewy633a/Meh63vLZvw4v/U8Lcp3sj1UaBiUDIbh/gxrzD3y216BAgB8hP1VQpg1QxEsqpqKojOfRQ52PUqQswd+V72vo+q8y3ycCN6JVCDel2D9qttUjgRxJsOB+DjXG4SiQfRvyA04luNeafZ8DLkXZL+/wKRsUjLAR//txGlrQeiXyoW7B3/+4Gi3JWWXqWEpugnstigDyq5vlOLQI9ijzfSsKiEgluGV46xO/ARyNgjCuJbdlQYcsAyG4dunFILYBf416VesYHhQnOgJFj/wQ+d0+ihz2r8MTzGSSBag3zTnqUWTMxShiKmiFvRXmcynSfEt8zplY/ydQVMsq4FcokMNP89rwSD+qUSexNGAfy3SkbeeiTi7XNmHXxk3HI+azGLWJIEGPooCEu1FwSwXwD+b7l/kMpksaiHfcHoIfbBVqsK+ghGogYQwSdhszaR3ntwE3oaTkE3yO6aKvICXG36aiCZnv30OmbRgzzaamsR8/bD7kMhQXuxsvGiVM3ZOxqyc0ImskKCxyHbIwbkPWTq4rR3QQTnDtPelM+p6KHmR+29DKNuAWc2yYLBoHHQMhuMUEx7b2Io3xIDI5v4gEMV1KlQh9tcVO1PgP9dk/VXlB54gDNyAh+wVa9T0ddiG0dNg8xl9FAvQ9gs3VdPeiHY0lfAlZLtMC9t2Fsk4WAf9N7oIQCVG/RKKE1/KJ+8WReT3KZ9+DmoEwlfcT3Kv3ono1offcRcDTBGsgOFAj16H3y4999reDHBYbLB90Tz5Bpvc8JMQ9yCT2w6ZdSUfU7PskshLGpdk/XUhXFYo5vcV8T6dFdwCXAeeg62sm+0XX0lkXyWSbIyyGxiUey/L4Ic1AaNwo/lkMQA09isy7lShv0xKCza8i9CBtg6kxx7yE/8jrRqRdrBl5qjnvDp/9y/CWwnwaacmTA+oECsAOo3Er0bPYglLrLCB4Eeh0WipmzmtzOwcJUgzvuh5HnUJjiDr7UUZm2RgjIfdPjB+OoudrM2SmIoruYdBYxJBlIDRuKcEdhhVCW7e7gD8n2CQqRg10Onqnm4XM62UBxzyEchj9BL3nzUbZEf1GoQ8FLkeafyIaNLs7oHyQ4IZZscFO24AyLkRQwji/pUvKCV4VcS8asV2Kl8HkNlJ3YnVolHoLmsppCjhvGDqQiT4Waf57CB75HRaiTGuRjEeWwXT0DBbhPzBVB/wbEvDVPvsMWQYikD7dPG4FmhrZjKcpxpi/fouAVaM0L1WowW4lfKK1eUhDryY4aVkUzT02mHqtIH02kLHoetJNWUwxZVnBOhJ1RJt89p+MBCRoHvcYc26Q4K4idacURfdsEkoV87zPfmGpQ/coas77ZkA9IX17sHWsM3/tEqArCR5NrkQ5oBJnJg4a/h8PGTMx4muB5QAAAABJRU5ErkJggg==" alt="Delta Galil Industries" class="head-logo">
+      <div>
+        <h1>TIFTON Go-Live Tracker</h1>
+      </div>
     </div>
     <div class="stat-row" id="stat-row"></div>
+    <div class="head-actions">
+      <button class="btn-io" id="btn-upload-raid">Upload RAID Log</button>
+      <button class="btn-io" id="btn-export">Export JSON</button>
+      <button class="btn-io" id="btn-import">Import JSON</button>
+      <button class="btn-copy-header" id="btn-copy-view">Copy view</button>
+    </div>
+  </div>
+
+  <div class="nav-row">
+    <div class="view-toggle" id="view-toggle">
+      <button data-view="board" class="active">Board</button>
+      <button data-view="analysis">Analysis</button>
+      <button data-view="fdd">FDD</button>
+      <button data-view="history">History</button>
+      <button data-view="calendar">Calendar</button>
+      <button data-view="table">Table</button>
+      <button data-view="monitoring">Monitoring</button>
+      <button data-view="onhold">On Hold</button>
+      <button data-view="closed">Closed</button>
+    </div>
+    <div class="as-of-nav" id="as-of-nav"></div>
+    <div class="nav-right">
+      <div class="nav-filters">
+        <select id="filter-status">
+          <option value="">All statuses</option>
+        </select>
+        <select id="filter-blocker">
+          <option value="">Blocker: All</option>
+          <option value="Y">Walmart blocker only</option>
+          <option value="N">Not a blocker</option>
+        </select>
+        <select id="filter-missing">
+          <option value="">Missing info: All</option>
+          <option value="devops">Missing DevOps #</option>
+          <option value="scoping">Missing Scoping Date</option>
+          <option value="target">Missing Target (UAT) Date</option>
+          <option value="either">Missing DevOps # or Target Date</option>
+        </select>
+      </div>
+      <input type="text" id="search" placeholder="Search issues...">
+    </div>
   </div>
 
   <div class="toolbar">
-    <div class="toolbar-filters">
-      <select id="filter-area"><option value="">All areas</option></select>
-      <select id="filter-status">
-        <option value="">All statuses</option>
-      </select>
-      <select id="filter-blocker">
-        <option value="">Blocker: All</option>
-        <option value="Y">Walmart blocker only</option>
-        <option value="N">Not a blocker</option>
-      </select>
-      <select id="filter-missing">
-        <option value="">Missing info: All</option>
-        <option value="devops">Missing DevOps #</option>
-        <option value="target">Missing Due Date</option>
-        <option value="either">Missing DevOps # or Due Date</option>
-      </select>
-      <button class="btn-add" id="btn-add">+ Add issue</button>
-      <button class="btn-copy" id="btn-copy-view">Copy view</button>
-    </div>
-    <div class="toolbar-search">
-      <input type="text" id="search" placeholder="Search issues...">
-      <div class="view-toggle" id="view-toggle">
-        <button data-view="board" class="active">Board</button>
-        <button data-view="table">Table</button>
-        <button data-view="calendar">Calendar</button>
-        <button data-view="completed">Completed</button>
-      </div>
-    </div>
+    <div class="active-filters" id="active-filters"></div>
   </div>
 
   <div class="body" id="body"></div>
@@ -649,10 +1028,6 @@
     <div class="board-scrollbar-proxy-inner" id="board-scrollbar-proxy-inner"></div>
   </div>
   <div class="save-note" id="save-note">Loading&hellip;</div>
-  <div class="data-io">
-    <button class="btn-io" id="btn-export">Export JSON</button>
-    <button class="btn-io" id="btn-import">Import JSON</button>
-  </div>
   <div class="logout-row"><a href="/logout" class="logout-link">Log out</a></div>
   <button type="button" class="network-fab" id="btn-network-diagram">Network diagram</button>
 </div>
@@ -660,78 +1035,27 @@
 <script>
 (function() {
   const ROOT = document.getElementById('tifton-tracker');
-  const CURRENT_DATA_VERSION = 7; // bump this whenever the seed data below should replace what's saved
+  const CURRENT_DATA_VERSION = 8; // bump this whenever the seed data below should replace what's saved
 
-  const SEED_ISSUES = [
-    {id:"raid-0", area:"Exotec", title:"Turn light blue when final pick is cut, and order is in complete status.", detail:"Turn light blue when final pick is cut, and order is in complete status.", status:"inprogress", owner:"James Adams", devops:"19923", priority:"High", blocker:"Y", targetDate:"2026-09-11", notes:"", reportedDate:""},
-    {id:"raid-1", area:"Inventory", title:"Confirm Bin Qty at Decant (FDD17676)", detail:"Confirm Bin Qty at Decant (FDD17676)", status:"inprogress", owner:"Hy-Tek", devops:"17676", priority:"Medium", blocker:"N", targetDate:"2026-10-09", notes:"", reportedDate:""},
-    {id:"raid-2", area:"Labeling", title:"Goods out of Pallet Label (FDD 17681)", detail:"Goods out of Pallet Label (FDD 17681)", status:"inprogress", owner:"Hy-Tek", devops:"17681", priority:"Medium", blocker:"N", targetDate:"2026-08-14", notes:"", reportedDate:""},
-    {id:"raid-3", area:"Packing", title:"Pack Station Box Recommendation (FDD18099)", detail:"Pack Station Box Recommendation (FDD18099)", status:"inprogress", owner:"Hy-Tek", devops:"18099", priority:"High", blocker:"N", targetDate:"2026-10-16", notes:"", reportedDate:""},
-    {id:"raid-4", area:"Exotec", title:"Remove chute-order relationship when picks are cancelled/cut", detail:"Ensure order relationship with chute is removed when all picks are concelled or cut from an orders", status:"inprogress", owner:"Mike Loop", devops:"22994", priority:"High", blocker:"Y/N", targetDate:"2026-09-11", notes:"", reportedDate:""},
-    {id:"raid-5", area:"Packing", title:"Packstation -Transient Data is getting stuck when user gets an error", detail:"Packstation -Transient Data is getting stuck when user gets an error", status:"inprogress", owner:"Roxie", devops:"24446", priority:"High", blocker:"Y", targetDate:"2026-09-11", notes:"", reportedDate:""},
-    {id:"raid-6", area:"RF / Devices", title:"Webtool release-user should also release the associated pick", detail:"Webtool to release user like kicking RF user but also releases the pick associated with user.", status:"inprogress", owner:"Michael Adamski", devops:"24546", priority:"High", blocker:"Y", targetDate:"2026-09-14", notes:"", reportedDate:""},
-    {id:"raid-7", area:"Inventory", title:"Validation/error-handling enhancements for SKU setup & wave release checks", detail:"Proposed validation/error handling enhancements around SKU setup and wave release checks.", status:"inprogress", owner:"Mike Loop", devops:"24713", priority:"High", blocker:"Y", targetDate:"2026-09-18", notes:"", reportedDate:""},
-    {id:"raid-8", area:"Shipping", title:"LTL MUs that are flipping to shipped", detail:"LTL MUs that are flipping to shipped", status:"inprogress", owner:"", devops:"25126", priority:"High", blocker:"Y", targetDate:"", notes:"Just came in", reportedDate:""},
-    {id:"raid-9", area:"Inventory", title:"DG - S-LAN locations have Loc_Allocation records", detail:"DG - S-LAN locations have Loc_Allocation records", status:"inprogress", owner:"Michael Adamski", devops:"25087", priority:"High", blocker:"Y", targetDate:"2026-09-18", notes:"", reportedDate:""},
-    {id:"raid-10", area:"Exotec", title:"JC Penny and KOHL's solution for divided orders - infinity chute", detail:"JC Penny and KOHL's solution for divided orders - infinity chute", status:"open", owner:"", devops:"", priority:"High", blocker:"N", targetDate:"", notes:"FDD to be created", reportedDate:""},
-    {id:"raid-11", area:"Equipment", title:"Lights for Tompkins for the bins (3 lights versus 2)", detail:"Lights for Tompkins for the bins (3 lights versus 2)", status:"open", owner:"", devops:"24368", priority:"High", blocker:"N", targetDate:"2026-08-28", notes:"", reportedDate:""},
-    {id:"raid-12", area:"Inventory", title:"Inventory Discrepancies", detail:"Inventory Discrepancies", status:"open", owner:"", devops:"", priority:"High", blocker:"N", targetDate:"", notes:"", reportedDate:""},
-    {id:"raid-13", area:"Inventory", title:"location ID pre-populates after dropping to CASI000001 the first time. (FDD)", detail:"location ID pre-populates after dropping to CASI000001 the first time. (FDD)", status:"open", owner:"Hy-Tek", devops:"14197", priority:"Low", blocker:"N", targetDate:"", notes:"FDD to be created", reportedDate:""},
-    {id:"raid-14", area:"Exotec", title:"Pick larger items before smaller (Exotec/Tompkins)", detail:"Pick larger items before smaller from Exotec and Tompkins. #4 Medium. (FDD)", status:"open", owner:"Hy-Tek", devops:"17684", priority:"Low", blocker:"N", targetDate:"", notes:"FDD to be created", reportedDate:""},
-    {id:"raid-15", area:"Inventory", title:"Bin Divisions (FDD)", detail:"Bin Divisions (FDD)", status:"open", owner:"Hy-Tek", devops:"17683", priority:"Low", blocker:"N", targetDate:"", notes:"FDD to be created", reportedDate:""},
-    {id:"raid-16", area:"Inbound", title:"Inbound Hospital Pallets", detail:"Inbound Hospital Pallets", status:"open", owner:"Delta Galil Ops, Hy-Tek", devops:"13997", priority:"Low", blocker:"N", targetDate:"", notes:"FDD to be revised", reportedDate:""},
-    {id:"raid-17", area:"Exotec", title:"Lowercase SKUs failing to decant to Exotec", detail:"Decanting in lowercase SKUs to Exotec. Part of UPC build, failed during testing.", status:"open", owner:"Hy-Tek", devops:"23126", priority:"Low", blocker:"N", targetDate:"2026-08-04", notes:"", reportedDate:""},
-    {id:"raid-18", area:"Consolidation", title:"Direct consolidated pallets to specific shipping lane", detail:"Direct users with consolidated pallets to specific shipping lane(FDD17678)", status:"open", owner:"Hy-Tek", devops:"17678", priority:"Low", blocker:"N", targetDate:"", notes:"ON HOLD - DEV", reportedDate:""},
-    {id:"raid-19", area:"Shipping", title:"Outbound QC percentage Codes entries (FDD 18277)", detail:"Outbound QC percentage Codes entries (FDD 18277)", status:"open", owner:"Hy-Tek", devops:"18277", priority:"Low", blocker:"N", targetDate:"2026-08-14", notes:"", reportedDate:""},
-    {id:"raid-20", area:"RF / Devices", title:"Logout should clear user from Session table", detail:"Webtools/UI Logging off needs to remove from Session table. (FDD)", status:"open", owner:"Hy-Tek", devops:"20958", priority:"Medium", blocker:"N", targetDate:"", notes:"FDD to be created", reportedDate:""},
-    {id:"raid-21", area:"Exotec", title:"DG -Oversized bin at Exotec creating 008 error message", detail:"DG -Oversized bin at Exotec creating 008 error message", status:"open", owner:"", devops:"24284", priority:"Medium", blocker:"N", targetDate:"", notes:"", reportedDate:""},
-    {id:"raid-22", area:"Consolidation", title:"RF Consolidation Flow (FDD)", detail:"RF Consolidation Flow (FDD)", status:"open", owner:"", devops:"24187", priority:"", blocker:"N", targetDate:"", notes:"FDD to be created", reportedDate:""},
-    {id:"raid-23", area:"Shipping", title:"Outbound Sorter Destination (FDD)", detail:"Outbound Sorter Destination (FDD)", status:"open", owner:"", devops:"24186", priority:"", blocker:"N", targetDate:"", notes:"FDD to be created", reportedDate:""},
-    {id:"raid-24", area:"RF / Devices", title:"Speed of scanning case packs on the floor locations.", detail:"Speed of scanning case packs on the floor locations.", status:"open", owner:"", devops:"24398", priority:"Medium", blocker:"N", targetDate:"", notes:"", reportedDate:""},
-    {id:"raid-25", area:"Exotec", title:"Mission sent to a bot on the bottom to go to a chute on the top level", detail:"Mission sent to a bot on the bottom to go to a chute on the top level", status:"open", owner:"", devops:"24436", priority:"Low", blocker:"", targetDate:"", notes:"", reportedDate:""},
-    {id:"raid-26", area:"Reporting", title:"Wave containerization report should include ship-to customer ID & carrier code", detail:"DG -Update the wave containerization report to look at ship_to_customer_ID and also carrier code", status:"open", owner:"", devops:"24694", priority:"Medium", blocker:"N", targetDate:"", notes:"", reportedDate:""},
-    {id:"raid-27", area:"Inventory", title:"Loc to loc move to give a clearer error message", detail:"Loc to loc move to give a clearer error message", status:"open", owner:"", devops:"24717", priority:"", blocker:"N", targetDate:"", notes:"", reportedDate:""},
-    {id:"raid-28", area:"Reporting", title:"Archiving BULK pick_queue records.", detail:"Archiving BULK pick_queue records.", status:"open", owner:"", devops:"24735", priority:"", blocker:"N", targetDate:"", notes:"", reportedDate:""},
-    {id:"raid-29", area:"Shipping", title:"Create a 0120 with mu_id", detail:"Create a 0120 with mu_id", status:"open", owner:"Steve", devops:"24820", priority:"", blocker:"N", targetDate:"", notes:"", reportedDate:""},
-    {id:"raid-30", area:"Exotec", title:"Order incorrectly assigned ORDR_SHIP_PGSN instead of routing through Exotec", detail:"Assigned a ORDR_SHIP_PGSN, when it should have just gone through Exotec.", status:"open", owner:"Alex", devops:"24957", priority:"High", blocker:"Y", targetDate:"", notes:"New just came in", reportedDate:""},
-    {id:"raid-31", area:"Exotec", title:"Show bag image indicator on Decant/Exotec/T-Sort screens", detail:"Decant/Exotec/TSORT - They want to display an image signifying the bag on these screens", status:"open", owner:"Jim", devops:"25048", priority:"", blocker:"", targetDate:"", notes:"New just came in", reportedDate:""},
-    {id:"raid-32", area:"Packing", title:"Pack station SKU summary gets cluttered with a new line per QTY scanned", detail:"Pack Station - The process of scanning UPCs and entering QTYs in pack station gets cumbersome to verify on screen because each QTY added to the pack LPN gets a new line in the SKU summary section.", status:"open", owner:"Jim", devops:"25049", priority:"", blocker:"", targetDate:"", notes:"FDD to be created", reportedDate:""},
-    {id:"raid-33", area:"Deployment", title:"Decant/split bin UOM", detail:"Decant/split bin UOM", status:"open", owner:"Beth", devops:"25090", priority:"High", blocker:"Y", targetDate:"2026-09-11", notes:"", reportedDate:""},
-    {id:"raid-34", area:"Packing", title:"Hospital screen-Pack-Out Workflow Cannot Reach Dock Status", detail:"Hospital screen-Pack-Out Workflow Cannot Reach Dock Status", status:"open", owner:"Hoang", devops:"25139", priority:"High", blocker:"Y", targetDate:"", notes:"", reportedDate:""},
-    {id:"raid-35", area:"RF / Devices", title:"DG- RF Drop LPN delays", detail:"DG- RF Drop LPN delays", status:"open", owner:"Hoang", devops:"25136", priority:"Medium", blocker:"Y", targetDate:"", notes:"", reportedDate:""},
-    {id:"raid-36", area:"Consolidation", title:"DG- RF Outbound Consolidator delays", detail:"DG- RF Outbound Consolidator delays", status:"open", owner:"Hoang", devops:"25137", priority:"Medium", blocker:"Y", targetDate:"", notes:"", reportedDate:""},
-    {id:"raid-37", area:"Reporting", title:"Wave Containerization Report Mismatch", detail:"Wave Containerization Report Mismatch", status:"open", owner:"Jake", devops:"25201", priority:"Medium", blocker:"", targetDate:"", notes:"Just came in", reportedDate:""},
-    {id:"raid-38", area:"Deployment", title:"DG UOM - GTP wrong quantities sending to Exotec", detail:"DG UOM - GTP wrong quantities sending to Exotec", status:"open", owner:"Antoine", devops:"25191", priority:"High", blocker:"Y", targetDate:"", notes:"Part of Bag UOM", reportedDate:""},
-    {id:"raid-39", area:"Inventory", title:"Not all allocated qty is being removed from CASI", detail:"Not all allocated qty is being removed from CASI", status:"testing", owner:"James Haumann", devops:"20921", priority:"High", blocker:"Y/N", targetDate:"2026-08-14", notes:"", reportedDate:""},
-    {id:"raid-40", area:"T-Sort", title:"DG - Print_Data records changing during picking process", detail:"DG - Print_Data records changing during picking process", status:"testing", owner:"Hoang", devops:"24214", priority:"High", blocker:"Y", targetDate:"2026-09-11", notes:"", reportedDate:""},
-    {id:"raid-41", area:"Shipping", title:"WALCP0813 released with incorrect ship_day/WXSOrderType values", detail:"DG released WALCP0813. ship_day was MA and WXSOrderType in print_data was MANUAL", status:"testing", owner:"Michael Adamski", devops:"24460", priority:"High", blocker:"Y", targetDate:"2026-09-07", notes:"", reportedDate:""},
-    {id:"raid-42", area:"Shipping", title:"Ship parent MU when all child MU's are shipped", detail:"Ship parent MU when all child MU's are shipped", status:"testing", owner:"", devops:"24116", priority:"High", blocker:"N", targetDate:"2026-08-12", notes:"", reportedDate:""},
-    {id:"raid-43", area:"Inbound", title:"Inbound pallet assignment should consider all ASNs assigned to a door", detail:"Inbound Pallet Assignments to need look at all assigned ASNs to Door for creating pallet assignments (FDD)", status:"testing", owner:"Delta Galil Ops", devops:"19968", priority:"Medium", blocker:"N", targetDate:"2026-08-07", notes:"", reportedDate:""},
-    {id:"raid-44", area:"Shipping", title:"EDI Routing Process (FDD 10521 /13999/18395)", detail:"EDI Routing Process (FDD 10521 /13999/18395)", status:"testing", owner:"Hoang", devops:"10521 /13999/18395", priority:"High", blocker:"Y", targetDate:"2026-08-11", notes:"", reportedDate:""},
-    {id:"raid-45", area:"Inbound", title:"Inbound receipts", detail:"Inbound receipts", status:"testing", owner:"Hy-Tek", devops:"20918", priority:"High", blocker:"N", targetDate:"2026-08-14", notes:"", reportedDate:""},
-    {id:"raid-46", area:"Packing", title:"Pack station Complete button turns green without an actual scan", detail:"Packstation complete button turning green when user scans even when they dont scan anything", status:"testing", owner:"Roxie", devops:"24338", priority:"High", blocker:"Y", targetDate:"2026-09-11", notes:"", reportedDate:""},
-    {id:"raid-47", area:"Shipping", title:"DG- Missing VLOX record for an OB sorter destination", detail:"DG- Missing VLOX record for an OB sorter destination", status:"testing", owner:"Hoang", devops:"24545", priority:"High", blocker:"Y", targetDate:"", notes:"Working to get an example and correct. 9/11/26", reportedDate:""},
-    {id:"raid-48", area:"Shipping", title:"MUs not flipping to shipped status", detail:"MUs Not flipping - JIm found an issue 8/14/26", status:"testing", owner:"Corbin Carter", devops:"24548", priority:"High", blocker:"Y", targetDate:"2026-09-11", notes:"", reportedDate:""},
-    {id:"raid-49", area:"Exotec", title:"CasePick allowed picks with no allocated qty in CASI (260 incomplete picks)", detail:"CasePick validation issue where users were able to pick SKUs onto robots with no allocated quantity in CASI, resulting in 260 incomplete picks on wave WAL081802.", status:"testing", owner:"James Haumann", devops:"24712", priority:"High", blocker:"Y", targetDate:"", notes:"Waiting for Bag uom", reportedDate:""},
-    {id:"raid-50", area:"Shipping", title:"Shipment overshipped item", detail:"Shipment overshipped item", status:"testing", owner:"James Haumann", devops:"24714", priority:"High", blocker:"Y", targetDate:"2026-09-04", notes:"", reportedDate:""},
-    {id:"raid-51", area:"T-Sort", title:"Wave pick casecut incorrectly updating loc_allocation during picking", detail:"Issue with the way wave pick casecut is updating loc_allocation during the pricking process.", status:"testing", owner:"James", devops:"24922", priority:"High", blocker:"Y", targetDate:"2026-09-11", notes:"9/4 - Short term fix - 9/11/2026 - long term", reportedDate:""},
-    {id:"raid-52", area:"Inventory", title:"WALCP wave created picks/replens with no inventory in the building", detail:"DG- WALCP. This is a wave of Walmart casepacks created pick and Replens. However, no inventory in the building", status:"testing", owner:"Hoang", devops:"24943", priority:"High", blocker:"Y", targetDate:"", notes:"New just came in", reportedDate:""},
-    {id:"raid-53", area:"Deployment", title:"Deliver Bag UoM change (FDD 14185)", detail:"Deliver Bag UoM change (FDD 14185)", status:"readycustomer", owner:"Steve", devops:"Parent 14185, 24242", priority:"High", blocker:"Y", targetDate:"2026-08-18", notes:"", reportedDate:""},
-    {id:"raid-54", area:"T-Sort", title:"Case quantities must be divisible by T-Sort values (T-Sort Max limitation)", detail:"System limitation requiring case quantities to be divisible by T-sort values; the team aligned on the need to support flexible quantities based on bot capacity rather than SKU divisibility. Tsort max issue.", status:"readyinstall", owner:"Jim Harjo", devops:"24017", priority:"High", blocker:"Y", targetDate:"2026-08-28", notes:"", reportedDate:""},
-    {id:"raid-55", area:"Exotec", title:"Robot max for Exotec - system only allows Exotec to pick 1", detail:"Robot max for Exotec - system only allows Exotec to pick 1", status:"readycustomer", owner:"DG", devops:"24117", priority:"High", blocker:"Y", targetDate:"2026-08-04", notes:"", reportedDate:""},
-    {id:"raid-56", area:"Inbound", title:"Inbound Dashboard", detail:"Inbound Dashboard", status:"readycustomer", owner:"Hy-Tek", devops:"20919", priority:"Medium", blocker:"N", targetDate:"2026-07-31", notes:"", reportedDate:""},
-    {id:"raid-57", area:"Exotec", title:"user_ID should update to GTP_INVNT when a pick routes to Exotec", detail:"When a pick gets sent to Exotec, user_ID needs to update to GTP_INVNT to show no inventory for SKU in system.", status:"readycustomer", owner:"Hy-Tek", devops:"19948", priority:"High", blocker:"Y", targetDate:"2026-08-04", notes:"", reportedDate:""},
-    {id:"raid-58", area:"Inventory", title:"Overriding bins when the qty is zero", detail:"Overriding bins when the qty is zero", status:"readyinstall", owner:"Hy-Tek", devops:"19942", priority:"Medium", blocker:"N", targetDate:"2026-06-12", notes:"", reportedDate:""},
-    {id:"raid-59", area:"Exotec", title:"No divert lane assignment received error on CasePick screen from Tompkins", detail:"No divert lane assignment received error on CasePick screen from Tompkins", status:"readyinstall", owner:"Hy-Tek", devops:"20962", priority:"Medium", blocker:"N", targetDate:"2026-08-14", notes:"", reportedDate:""},
-    {id:"raid-60", area:"Shipping", title:"Outbound Sortation Configuration Dashboard (route customers to lanes)", detail:"Outbound Sortation Configuration Dashboard. - Tool for DG to route customers to specific lanes.", status:"readyinstall", owner:"Hy-Tek", devops:"20922", priority:"Medium", blocker:"N", targetDate:"2026-07-10", notes:"", reportedDate:""},
-    {id:"raid-61", area:"Exotec", title:"Exotec SKU description / SKU property mismatch", detail:"Exotec SKU Description - SKU Property (FDD 18278) - 7/30 Test on 58 (send in a pick, look at it on the pick).", status:"readyinstall", owner:"Hy-Tek", devops:"18278", priority:"High", blocker:"N", targetDate:"2026-08-11", notes:"", reportedDate:""},
-    {id:"raid-62", area:"Exotec", title:"Pick Queue is not updating user id when an Exotec Pick is completed", detail:"Pick Queue is not updating user id when an Exotec Pick is completed", status:"readyinstall", owner:"Hy-Tek", devops:"19357", priority:"High", blocker:"N", targetDate:"2026-08-11", notes:"", reportedDate:""},
-  ];
+  const SEED_ISSUES = [];
 
-  const STATUS_LABELS = { open: 'Open', inprogress: 'In Progress (DEV)', testing: 'Testing (PSO)', readyinstall: 'Ready for Install', readycustomer: 'Ready for Customer', completed: 'Completed' };
-  const STATUS_ORDER = ['open', 'inprogress', 'testing', 'readyinstall', 'readycustomer', 'completed'];
+  const STATUS_LABELS = { open: 'Open', inprogress: 'In Progress (Dev)', testing: 'Testing', readycustomer: 'Ready for Customer', readyinstall: 'Ready for Install', monitoring: 'Monitoring', onhold: 'On Hold', closed: 'Closed' };
+  // Full canonical list of every status the tool understands — used by
+  // filters, the Table view, and the edit modal's status dropdown.
+  const STATUS_ORDER = ['open', 'inprogress', 'testing', 'readycustomer', 'readyinstall', 'monitoring', 'onhold', 'closed'];
+  // The Board view intentionally shows only these five, in this exact
+  // order — Monitoring/On Hold/Closed items still exist and are fully
+  // trackable elsewhere (Table view, Closed tab, filters), they're just
+  // not given their own Board column.
+  const BOARD_STATUS_ORDER = ['open', 'inprogress', 'testing', 'readycustomer', 'readyinstall'];
+  // Scoping (column K, "Scoping date") is the date Hy-Tek dev needs to
+  // determine and scope the issue. It only counts as overdue while the
+  // item is still Open or In Progress (Dev) — once it has moved on to
+  // Testing or later, the scoping work is clearly done.
+  const SCOPING_STATUSES = ['open', 'inprogress'];
 
   let issues = [];
+  let currentAsOfDate = null;
   let currentView = 'board';
   let calendarMonth = (() => {
     const d = new Date();
@@ -739,6 +1063,17 @@
   })();
   let selectedCalendarDate = null;
   let editingId = null;
+  // Locally-selected FDD review files, one per issue — kept in memory only
+  // (not sent to the server/D1), so previews last only for this browser
+  // tab until cleared or the page is refreshed.
+  // Per-issue FDD file cache. Metadata (filename/size/contentType/
+  // uploadedAt) mirrors what's stored server-side in D1; blobUrl/loaded
+  // are populated lazily in THIS browser tab only, either right after an
+  // upload (built straight from the File object) or the first time a
+  // stored file's "View" is clicked (fetched and decoded from the server).
+  let fddDocs = {}; // issue id -> {filename, contentType, size, uploadedAt, blobUrl?, loaded, loading?, uploading?}
+  let expandedFddId = null; // which row's preview is currently open, if any
+  const MAX_FDD_FILE_BYTES = 8 * 1024 * 1024; // ~8 MB raw file (matches the server's base64 size ceiling with room to spare)
   let activeBoardEl = null;
 
   async function loadIssues() {
@@ -747,6 +1082,7 @@
       if (!res.ok) throw new Error('Failed to load issues: ' + res.status);
       const payload = await res.json();
       const storedVersion = payload.dataVersion || 0;
+      currentAsOfDate = payload.asOfDate || null;
 
       if (storedVersion < CURRENT_DATA_VERSION) {
         // Fresh dataset supersedes whatever was previously saved.
@@ -778,15 +1114,22 @@
     if (changed) saveIssues();
   }
 
-  async function saveIssues() {
+  // asOfDate is only passed when this save represents a live RAID Log
+  // upload (see openUploadRaidModal) — omitting it on manual single-issue
+  // edits means the "RAID LOG AS OF" date on the Board only moves when you
+  // actually re-upload the source spreadsheet, not on every small tweak.
+  async function saveIssues(asOfDate) {
     const noteEl = document.getElementById('save-note');
     try {
+      const body = { issues, dataVersion: CURRENT_DATA_VERSION };
+      if (asOfDate) body.asOfDate = asOfDate;
       const res = await fetch('/api/issues', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ issues, dataVersion: CURRENT_DATA_VERSION }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error('Save failed: ' + res.status);
+      if (asOfDate) currentAsOfDate = asOfDate;
       if (noteEl) { noteEl.textContent = 'Saved · shared with everyone using this tracker'; }
     } catch (e) {
       if (noteEl) { noteEl.textContent = 'Could not save — changes may not persist'; }
@@ -794,40 +1137,81 @@
     }
   }
 
-  function uniqueAreas() {
-    return [...new Set(issues.map(i => i.area))].sort();
-  }
-
   function populateFilters() {
-    const areaSel = document.getElementById('filter-area');
-    const curArea = areaSel.value;
-    areaSel.innerHTML = '<option value="">All areas</option>' + uniqueAreas().map(a => `<option value="${a}">${a}</option>`).join('');
-    areaSel.value = curArea;
-
     const statusSel = document.getElementById('filter-status');
     const curStatus = statusSel.value;
     statusSel.innerHTML = '<option value="">All statuses</option>' + STATUS_ORDER.map(s => `<option value="${s}">${STATUS_LABELS[s]}</option>`).join('');
     statusSel.value = curStatus;
   }
 
+  function isIsoDate(s) {
+    return /^\d{4}-\d{2}-\d{2}$/.test(s || '');
+  }
+
+  // A target date that's a real ISO date (not text like "TBD" or "On Hold"),
+  // in the past, and not yet closed — closed items don't count as "late"
+  // even if their target date has passed, since the work is done.
+  function isLate(issue) {
+    if (!isIsoDate(issue.targetDate)) return false;
+    if (issue.status === 'closed') return false;
+    return issue.targetDate < todayISO();
+  }
+
+  function daysBetween(fromIso, toIso) {
+    const a = new Date(fromIso + 'T00:00:00');
+    const b = new Date(toIso + 'T00:00:00');
+    return Math.round((b - a) / 86400000);
+  }
+
+  // How many whole calendar days past the current target date an item is,
+  // based on today's date — not tied to when it first became late, since
+  // the target date itself can move (see Due Date Changes on Analysis).
+  // Only meaningful when isLate(issue) is true.
+  function daysLate(issue) {
+    if (!isLate(issue)) return 0;
+    return daysBetween(issue.targetDate, todayISO());
+  }
+
+  // Scoping date has passed while the item is still Open / In Progress (Dev).
+  function isScopingLate(issue) {
+    if (!isIsoDate(issue.scopingDate)) return false;
+    if (!SCOPING_STATUSES.includes(issue.status)) return false;
+    return issue.scopingDate < todayISO();
+  }
+
+  function daysScopingLate(issue) {
+    if (!isScopingLate(issue)) return 0;
+    return daysBetween(issue.scopingDate, todayISO());
+  }
+
+  function dayWord(n) { return n === 1 ? 'DAY' : 'DAYS'; }
+
+  let lateFilterActive = false;
+  let scopingLateFilterActive = false;
+
   function getFiltered() {
-    const area = document.getElementById('filter-area').value;
     const status = document.getElementById('filter-status').value;
     const blockerFilter = document.getElementById('filter-blocker').value;
     const missingFilter = document.getElementById('filter-missing').value;
     const q = document.getElementById('search').value.trim().toLowerCase();
     return issues.filter(i => {
-      if (area && i.area !== area) return false;
       if (status && i.status !== status) return false;
       if (blockerFilter === 'Y' && !isBlocker(i.blocker)) return false;
       if (blockerFilter === 'N' && isBlocker(i.blocker)) return false;
       const missingDevops = !i.devops;
-      const missingTarget = !i.targetDate;
+      // "Missing" a due date means blank OR a non-date placeholder like
+      // "TBD"/"On Hold"/"N/A" — anything that isn't a real, usable date.
+      const missingTarget = !isIsoDate(i.targetDate);
       if (missingFilter === 'devops' && !missingDevops) return false;
+      // Same rule for Scoping: blank or a text placeholder counts as missing.
+      const missingScoping = !isIsoDate(i.scopingDate);
+      if (missingFilter === 'scoping' && !missingScoping) return false;
       if (missingFilter === 'target' && !missingTarget) return false;
       if (missingFilter === 'either' && !(missingDevops || missingTarget)) return false;
+      if (lateFilterActive && !isLate(i)) return false;
+      if (scopingLateFilterActive && !isScopingLate(i)) return false;
       if (q) {
-        const hay = (i.title + ' ' + i.detail + ' ' + i.area + ' ' + (i.owner||'') + ' ' + (i.devops||'') + ' ' + (i.notes||'')).toLowerCase();
+        const hay = (i.title + ' ' + i.detail + ' ' + (i.owner||'') + ' ' + (i.devops||'') + ' ' + (i.notes||'')).toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -838,12 +1222,33 @@
     const counts = {};
     STATUS_ORDER.forEach(s => { counts[s] = 0; });
     issues.forEach(i => { counts[i.status] = (counts[i.status]||0) + 1; });
-    const blockerCount = issues.filter(i => isBlocker(i.blocker)).length;
+    // Both the Late and Walmart Blocker header tiles intentionally only
+    // count items in an active Board status (Open, In Progress, Testing,
+    // Ready for Customer, Ready for Install) — a Closed/On Hold/Monitoring
+    // item doesn't need to be flagged as late or as a blocker anymore.
+    const blockerCount = issues.filter(i => isBlocker(i.blocker) && BOARD_STATUS_ORDER.includes(i.status)).length;
     const blockerActive = document.getElementById('filter-blocker').value === 'Y';
+    const lateCount = issues.filter(i => isLate(i) && BOARD_STATUS_ORDER.includes(i.status)).length;
+    const scopingLateCount = issues.filter(isScopingLate).length;
     const row = document.getElementById('stat-row');
-    row.innerHTML = STATUS_ORDER.map(s =>
+    // Mirrors the Board view's 5 columns for a clean, consistent header —
+    // Monitoring/On Hold/Closed items are still fully counted and
+    // visible elsewhere (Table view, Closed tab), just not given their
+    // own tile here.
+    row.innerHTML = BOARD_STATUS_ORDER.map(s =>
       `<div class="stat ${s}"><div class="n">${counts[s]}</div><div class="l">${STATUS_LABELS[s]}</div></div>`
-    ).join('') + `<div class="stat blocker-stat${blockerActive ? ' active' : ''}" id="blocker-stat" title="Click to show only Walmart blockers"><div class="n">${blockerCount}</div><div class="l">Walmart Blockers</div></div>`;
+    ).join('')
+      + `<div class="stat scoping-stat${scopingLateFilterActive ? ' active' : ''}" id="scoping-stat" title="Click to show only items past their Hy-Tek scoping date (still Open or In Progress)"><div class="n">${scopingLateCount}</div><div class="l">Scoping Overdue</div></div>`
+      + `<div class="stat late-stat${lateFilterActive ? ' active' : ''}" id="late-stat" title="Click to show only late items (target date has passed)"><div class="n">${lateCount}</div><div class="l">Late</div></div>`
+      + `<div class="stat blocker-stat${blockerActive ? ' active' : ''}" id="blocker-stat" title="Click to show only Walmart blockers"><div class="n">${blockerCount}</div><div class="l">Walmart Blockers</div></div>`;
+    document.getElementById('scoping-stat').addEventListener('click', () => {
+      scopingLateFilterActive = !scopingLateFilterActive;
+      render();
+    });
+    document.getElementById('late-stat').addEventListener('click', () => {
+      lateFilterActive = !lateFilterActive;
+      render();
+    });
     document.getElementById('blocker-stat').addEventListener('click', () => {
       const sel = document.getElementById('filter-blocker');
       sel.value = sel.value === 'Y' ? '' : 'Y';
@@ -853,15 +1258,80 @@
 
   function renderHeaderSummary() {
     const el = document.getElementById('header-summary');
+    if (!el) return; // the header no longer shows this text, but keep the function harmless
     const n = issues.length;
     el.textContent = n === 0 ? 'No issues yet' : `${n} tracked issue${n === 1 ? '' : 's'}`;
   }
 
+  // Shown persistently in the nav row (not just on Board) so it's visible
+  // no matter which tab is open.
+  function renderAsOfNav() {
+    const el = document.getElementById('as-of-nav');
+    if (!el) return;
+    if (currentAsOfDate) {
+      el.textContent = `RAID LOG AS OF ${formatDate(currentAsOfDate).toUpperCase()}`;
+      el.classList.remove('as-of-nav-empty');
+    } else {
+      el.textContent = 'No RAID log uploaded yet — use "Upload RAID Log" to get started';
+      el.classList.add('as-of-nav-empty');
+    }
+  }
+
+  function renderActiveFilters() {
+    const container = document.getElementById('active-filters');
+    const status = document.getElementById('filter-status').value;
+    const blocker = document.getElementById('filter-blocker').value;
+    const missing = document.getElementById('filter-missing').value;
+    const search = document.getElementById('search').value;
+
+    const chips = [];
+    if (status) chips.push({ key: 'status', label: STATUS_LABELS[status] || status });
+    if (blocker === 'Y') chips.push({ key: 'blocker', label: 'Walmart blocker only' });
+    if (blocker === 'N') chips.push({ key: 'blocker', label: 'Not a blocker' });
+    if (missing === 'devops') chips.push({ key: 'missing', label: 'Missing DevOps #' });
+    if (missing === 'scoping') chips.push({ key: 'missing', label: 'Missing Scoping Date' });
+    if (missing === 'target') chips.push({ key: 'missing', label: 'Missing Target (UAT) Date' });
+    if (missing === 'either') chips.push({ key: 'missing', label: 'Missing DevOps # or Target Date' });
+    if (scopingLateFilterActive) chips.push({ key: 'scoping', label: 'Scoping overdue', cls: 'scoping-chip' });
+    if (lateFilterActive) chips.push({ key: 'late', label: 'Late', cls: 'late-chip' });
+    if (search.trim()) chips.push({ key: 'search', label: `Search: "${search.trim()}"` });
+
+    container.innerHTML = chips.map(c =>
+      `<span class="filter-chip${c.cls ? ' ' + c.cls : ''}">${c.label}<button type="button" class="filter-chip-x" data-key="${c.key}" title="Remove this filter">&times;</button></span>`
+    ).join('');
+
+    container.querySelectorAll('.filter-chip-x').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const key = btn.getAttribute('data-key');
+        if (key === 'status') document.getElementById('filter-status').value = '';
+        else if (key === 'blocker') document.getElementById('filter-blocker').value = '';
+        else if (key === 'missing') document.getElementById('filter-missing').value = '';
+        else if (key === 'late') lateFilterActive = false;
+        else if (key === 'scoping') scopingLateFilterActive = false;
+        else if (key === 'search') document.getElementById('search').value = '';
+        render();
+      });
+    });
+  }
+
   function formatDate(iso) {
     if (!iso) return '';
+    // Target dates pulled from the RAID log are sometimes text placeholders
+    // ("TBD", "On HOLD", "N/A", "FDD to be created") rather than real
+    // dates — only attempt to reformat things that actually look like an
+    // ISO date (YYYY-MM-DD); anything else is shown exactly as entered
+    // rather than becoming "Invalid Date".
+    if (!isIsoDate(iso)) return iso;
     const [y, m, d] = iso.split('-').map(Number);
     const dt = new Date(y, m - 1, d);
+    if (isNaN(dt)) return iso;
     return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  // For the two card dates: a blank cell reads "TBD" rather than
+  // disappearing, so every card always shows both lines.
+  function formatDateOrTbd(v) {
+    return v ? formatDate(v) : 'TBD';
   }
 
   function isBlocker(blocker) {
@@ -869,19 +1339,25 @@
   }
 
   function cardHtml(issue) {
-    const priorityClass = (issue.priority || '').toLowerCase();
+    const priorityClass = ['high','medium','low'].includes((issue.priority || '').toLowerCase()) ? issue.priority.toLowerCase() : '';
+    const priorityLabel = priorityClass ? `${issue.priority} priority` : `Priority: ${issue.priority}`;
+    const late = isLate(issue);
+    const scopingLate = isScopingLate(issue);
+    const sd = daysScopingLate(issue);
+    const td = daysLate(issue);
     return `
-      <div class="card ${issue.status}" data-id="${issue.id}">
+      <div class="card ${issue.status}${scopingLate ? ' is-scoping-late' : ''}${late ? ' is-late' : ''}" data-id="${issue.id}">
         <div class="card-top">
-          <span class="tag">${issue.area}</span>
-          ${isBlocker(issue.blocker) ? `<span class="blocker-tag">Walmart blocker${issue.blocker === 'Y/N' ? ' (Y/N)' : ''}</span>` : ''}
+          <div class="card-tag-slot card-tag-left">${late ? `<span class="late-tag">LATE: ${td} ${dayWord(td)}</span>` : ''}${scopingLate ? `<span class="scoping-late-tag">SCOPING OVERDUE: ${sd} ${dayWord(sd)}</span>` : ''}</div>
+          <div class="card-tag-slot card-tag-right">${isBlocker(issue.blocker) ? `<span class="blocker-tag">Walmart blocker${issue.blocker === 'Y/N' ? ' (Y/N)' : ''}</span>` : ''}</div>
         </div>
         <div class="card-title">${issue.title}</div>
-        <div class="meta-row">
-          ${issue.priority ? `<span class="priority-tag ${priorityClass}">${issue.priority} priority</span>` : ''}
-          ${issue.targetDate ? `<span class="target-tag">Target: ${formatDate(issue.targetDate)}</span>` : ''}
-        </div>
         <div class="card-detail">${issue.detail}</div>
+        ${issue.priority ? `<div class="meta-row"><span class="priority-tag ${priorityClass}">${priorityLabel}</span></div>` : ''}
+        <div class="date-row">
+          <span class="scoping-tag${scopingLate ? ' scoping-tag-late' : ''}" title="Scoping date — when Hy-Tek dev needs to determine and scope the issue">Scoping: <span class="${issue.scopingDate ? '' : 'date-tbd'}">${formatDateOrTbd(issue.scopingDate)}</span></span>
+          <span class="target-tag${late ? ' target-tag-late' : ''}" title="Target date — when Hy-Tek will deliver the update to Delta for UAT">Target (UAT): <span class="${issue.targetDate ? '' : 'date-tbd'}">${formatDateOrTbd(issue.targetDate)}</span></span>
+        </div>
         <div class="card-footer">
           <div>
             ${issue.reportedDate ? `<div class="card-reported">Reported ${formatDate(issue.reportedDate)}</div>` : ''}
@@ -893,7 +1369,7 @@
   }
 
   function renderBoard(list) {
-    const cols = STATUS_ORDER.map(st => {
+    const cols = BOARD_STATUS_ORDER.map(st => {
       const items = list.filter(i => i.status === st);
       return `
         <div class="board-col">
@@ -905,36 +1381,55 @@
     return `<div class="board">${cols}</div>`;
   }
 
+  // Shared row markup for the Table and Closed views.
+  function issueTableHead() {
+    return `<thead><tr><th>Issue</th><th>DevOps #</th><th>Priority</th><th>Walmart Blocker</th><th>Reported</th><th>Scoping</th><th>Target (UAT)</th><th>Owner</th><th>Status</th></tr></thead>`;
+  }
+
+  function issueTableRow(i) {
+    const scopingLate = isScopingLate(i);
+    const late = isLate(i);
+    return `
+      <tr data-id="${i.id}">
+        <td>
+          <strong>${i.title}</strong><br><span style="color:var(--ink-soft);font-size:12px;">${i.detail}</span>
+          ${i.notes ? `<br><span style="color:var(--steel-dark);font-size:11.5px;font-style:italic;"><strong>Notes:</strong> ${i.notes}</span>` : ''}
+        </td>
+        <td>${i.devops || '—'}</td>
+        <td>${i.priority || '—'}</td>
+        <td>${isBlocker(i.blocker) ? `<span class="blocker-tag">${i.blocker}</span>` : (i.blocker || '—')}</td>
+        <td>${i.reportedDate ? formatDate(i.reportedDate) : '—'}</td>
+        <td${scopingLate ? ' style="color:var(--plum);font-weight:700;"' : ''}>${i.scopingDate ? formatDate(i.scopingDate) : '—'}</td>
+        <td${late ? ' style="color:var(--rust);font-weight:700;"' : ''}>${i.targetDate ? formatDate(i.targetDate) : '—'}</td>
+        <td>${i.owner || '—'}</td>
+        <td><span class="status-pill ${i.status}">${STATUS_LABELS[i.status]}</span></td>
+      </tr>
+    `;
+  }
+
   function renderTable(list) {
     const sorted = list.slice().sort((a,b) => {
       const statusDiff = STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status);
       return statusDiff !== 0 ? statusDiff : a.title.localeCompare(b.title);
     });
-    if (!sorted.length) return '<div class="empty">No issues match these filters</div>';
+    if (!sorted.length) {
+      return `
+        <div class="closed-wrap">
+          <div class="closed-header">RAID Log Tabular View</div>
+          <div class="empty">No issues match these filters</div>
+        </div>
+      `;
+    }
     return `
-      <table>
-        <thead><tr><th>Area</th><th>Issue</th><th>DevOps #</th><th>Priority</th><th>Walmart Blocker</th><th>Reported</th><th>Target</th><th>Owner</th><th>Status</th></tr></thead>
-        <tbody>
-          ${sorted.map(i => `
-            <tr data-id="${i.id}">
-              <td>${i.area}</td>
-              <td>
-                <strong>${i.title}</strong><br><span style="color:var(--ink-soft);font-size:12px;">${i.detail}</span>
-                ${i.notes ? `<br><span style="color:var(--steel-dark);font-size:11.5px;font-style:italic;"><strong>Notes:</strong> ${i.notes}</span>` : ''}
-              </td>
-              <td>${i.devops || '—'}</td>
-              <td>${i.priority || '—'}</td>
-              <td>${isBlocker(i.blocker) ? `<span class="blocker-tag">${i.blocker}</span>` : (i.blocker || '—')}</td>
-              <td>${i.reportedDate ? formatDate(i.reportedDate) : '—'}</td>
-              <td>${i.targetDate ? formatDate(i.targetDate) : '—'}</td>
-              <td>${i.owner || '—'}</td>
-              <td>
-                <span class="status-pill ${i.status}">${STATUS_LABELS[i.status]}</span>
-              </td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
+      <div class="closed-wrap">
+        <div class="closed-header">RAID Log Tabular View <span class="count">(${sorted.length})</span></div>
+        <table>
+          ${issueTableHead()}
+          <tbody>
+            ${sorted.map(issueTableRow).join('')}
+          </tbody>
+        </table>
+      </div>
     `;
   }
 
@@ -1003,29 +1498,1248 @@
     `;
   }
 
-  function renderCompletedList(list) {
-    const completed = list.filter(i => i.status === 'completed').sort((a,b) => a.title.localeCompare(b.title));
-    if (!completed.length) return '<div class="empty">No completed issues match these filters.</div>';
+  function renderClosedList(list) {
+    const closed = list.filter(i => i.status === 'closed').sort((a,b) => a.title.localeCompare(b.title));
+    if (!closed.length) return '<div class="empty">No closed issues match these filters.</div>';
     return `
-      <div class="completed-wrap">
-        <div class="completed-header">Completed <span class="count">(${completed.length})</span></div>
-        <div class="completed-grid">${completed.map(cardHtml).join('')}</div>
+      <div class="closed-wrap">
+        <div class="closed-header">Closed <span class="count">(${closed.length})</span></div>
+        <table>
+          ${issueTableHead()}
+          <tbody>
+            ${closed.map(issueTableRow).join('')}
+          </tbody>
+        </table>
       </div>
     `;
+  }
+
+  // Monitoring tab: every item currently in Monitoring status (respecting
+  // the active filters), laid out like the Closed tab.
+  function renderMonitoringList(list) {
+    const monitoring = list.filter(i => i.status === 'monitoring').sort((a,b) => a.title.localeCompare(b.title));
+    if (!monitoring.length) return '<div class="empty">No monitoring issues match these filters.</div>';
+    return `
+      <div class="closed-wrap">
+        <div class="closed-header monitoring-header">Monitoring <span class="count">(${monitoring.length})</span></div>
+        <table>
+          ${issueTableHead()}
+          <tbody>
+            ${monitoring.map(issueTableRow).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  // On Hold tab: every item currently in On Hold status (respecting the
+  // active filters), laid out like the Monitoring and Closed tabs.
+  function renderOnHoldList(list) {
+    const onHold = list.filter(i => i.status === 'onhold').sort((a,b) => a.title.localeCompare(b.title));
+    if (!onHold.length) return '<div class="empty">No on hold issues match these filters.</div>';
+    return `
+      <div class="closed-wrap">
+        <div class="closed-header onhold-header">On Hold <span class="count">(${onHold.length})</span></div>
+        <table>
+          ${issueTableHead()}
+          <tbody>
+            ${onHold.map(issueTableRow).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  // ---------- Per-issue history (shown from the edit modal) ----------
+  //
+  // An issue's history is rebuilt from two sources, merged in time order:
+  //   1. RAID log upload snapshots (raid_snapshots): each upload is a full
+  //      copy of every item, so comparing consecutive uploads shows what
+  //      changed. Only items with a DevOps # can be matched across uploads
+  //      (see isTrackableId), the same rule the History tab uses.
+  //   2. editLog: edits saved in this tracker's edit form. Each save
+  //      appends {at, changes:[{field, from, to}]} to the issue, and the
+  //      log is carried forward when a new RAID log is uploaded.
+  // Walking both in order against a running "known state" means an edit
+  // that a later upload also reflects is only shown once.
+  const HISTORY_FIELDS = [
+    { key: 'status',      label: 'Status' },
+    { key: 'targetDate',  label: 'Target (UAT) date', isDate: true },
+    { key: 'scopingDate', label: 'Scoping date', isDate: true },
+    { key: 'owner',       label: 'Owner' },
+    { key: 'priority',    label: 'Priority' },
+    { key: 'blocker',     label: 'Walmart blocker' },
+  ];
+  const EDIT_LOG_MAX = 200;
+
+  function historyValueLabel(field, v) {
+    if (v == null || v === '') return field.isDate ? 'No date' : '—';
+    if (field.key === 'status') return STATUS_LABELS[v] || v;
+    if (field.isDate) return formatDate(v);
+    return String(v);
+  }
+
+  function daysBetweenIso(fromIso, toIso) {
+    const [fy, fm, fd] = fromIso.split('-').map(Number);
+    const [ty, tm, td] = toIso.split('-').map(Number);
+    return Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / 86400000);
+  }
+
+  function pickHistoryFields(item) {
+    const out = {};
+    HISTORY_FIELDS.forEach(f => { out[f.key] = item && item[f.key] != null ? String(item[f.key]) : ''; });
+    return out;
+  }
+
+  // Changes between two field sets, for the fields a user cares about.
+  function diffHistoryFields(before, after) {
+    const changes = [];
+    HISTORY_FIELDS.forEach(f => {
+      const a = before[f.key] || '';
+      const b = after[f.key] || '';
+      if (a !== b) changes.push({ field: f.key, from: a, to: b });
+    });
+    return changes;
+  }
+
+  // Snapshot details never change once saved, so they're cached by id.
+  const snapshotDetailCache = new Map();
+  async function loadAllSnapshotDetails() {
+    const res = await fetch('/api/snapshots');
+    if (!res.ok) throw new Error('Failed to load upload history: ' + res.status);
+    const list = (await res.json()).snapshots || [];
+    const missing = list.filter(s => !snapshotDetailCache.has(s.id));
+    const fetched = await Promise.all(missing.map(s =>
+      fetch('/api/snapshots/' + s.id).then(r => r.ok ? r.json() : null).catch(() => null)));
+    fetched.forEach((d, i) => { if (d) snapshotDetailCache.set(missing[i].id, d); });
+    return list
+      .map(s => snapshotDetailCache.get(s.id))
+      .filter(Boolean)
+      .sort((a, b) => String(a.uploadedAt).localeCompare(String(b.uploadedAt)));
+  }
+
+  function buildIssueTimeline(issue, snapshots) {
+    const trackable = isTrackableId(issue.id);
+    const steps = [];
+    if (trackable) {
+      snapshots.forEach(snap => {
+        const item = (snap.issues || []).find(i => i.id === issue.id) || null;
+        steps.push({ kind: 'upload', at: snap.uploadedAt, item });
+      });
+    }
+    (Array.isArray(issue.editLog) ? issue.editLog : []).forEach(e => {
+      steps.push({ kind: 'edit', at: e.at, changes: Array.isArray(e.changes) ? e.changes : [] });
+    });
+    steps.sort((a, b) => String(a.at).localeCompare(String(b.at)));
+
+    const events = [];
+    let known = null;
+    let absent = false;
+    steps.forEach(step => {
+      if (step.kind === 'upload') {
+        if (!step.item) {
+          if (known && !absent) events.push({ at: step.at, source: 'Upload', note: 'Not in this RAID log upload' });
+          if (known) absent = true;
+          return;
+        }
+        const state = pickHistoryFields(step.item);
+        if (!known) {
+          events.push({ at: step.at, source: 'Upload', note: 'First appeared in a RAID log upload', initial: state });
+        } else {
+          const changes = diffHistoryFields(known, state);
+          if (absent) events.push({ at: step.at, source: 'Upload', note: 'Back in the RAID log', changes });
+          else if (changes.length) events.push({ at: step.at, source: 'Upload', changes });
+        }
+        known = state;
+        absent = false;
+      } else {
+        if (!known) {
+          known = {};
+          HISTORY_FIELDS.forEach(f => { known[f.key] = ''; });
+          step.changes.forEach(c => { if (c.field in known) known[c.field] = c.from || ''; });
+        }
+        const real = step.changes.filter(c => (c.field in known) && (known[c.field] || '') !== (c.to || ''));
+        real.forEach(c => { known[c.field] = c.to || ''; });
+        if (real.length) events.push({ at: step.at, source: 'Tracker edit', changes: real });
+      }
+    });
+
+    // Anything the current card shows that the steps above don't explain
+    // (e.g. edits saved before edit history was recorded).
+    if (known) {
+      const leftover = diffHistoryFields(known, pickHistoryFields(issue));
+      if (leftover.length) events.push({ at: null, source: 'Tracker edit', note: 'Changed since the last recorded update (date not recorded)', changes: leftover });
+    }
+
+    // Summary of date movement and status changes.
+    let slips = 0, slipDays = 0, pullins = 0, statusChanges = 0;
+    events.forEach(ev => (ev.changes || []).forEach(c => {
+      if (c.field === 'status') statusChanges++;
+      if (c.field === 'targetDate' && isIsoDate(c.from) && isIsoDate(c.to)) {
+        const d = daysBetweenIso(c.from, c.to);
+        if (d > 0) { slips++; slipDays += d; ev.slip = true; }
+        else if (d < 0) pullins++;
+      }
+    }));
+    return { trackable, events, slips, slipDays, pullins, statusChanges };
+  }
+
+  function renderHistoryChange(c) {
+    const field = HISTORY_FIELDS.find(f => f.key === c.field) || { key: c.field, label: c.field };
+    let delta = '';
+    if (field.isDate && isIsoDate(c.from) && isIsoDate(c.to)) {
+      const d = daysBetweenIso(c.from, c.to);
+      if (d > 0) delta = `<span class="ih-delta slip">+${d} day${d === 1 ? '' : 's'} (pushed back)</span>`;
+      else if (d < 0) delta = `<span class="ih-delta pullin">${d} day${d === -1 ? '' : 's'} (pulled in)</span>`;
+    }
+    return `<div class="ih-change"><span class="ih-field">${esc(field.label)}:</span>
+      <span class="ih-old">${esc(historyValueLabel(field, c.from))}</span> &rarr;
+      <span>${esc(historyValueLabel(field, c.to))}</span>${delta}</div>`;
+  }
+
+  function renderIssueHistoryHtml(issue, t) {
+    const chips = [];
+    if (t.slips) chips.push(`<span class="ih-chip slip">Target date pushed back ${t.slips}&times; (+${t.slipDays} day${t.slipDays === 1 ? '' : 's'} total)</span>`);
+    else chips.push('<span class="ih-chip">No target date pushbacks</span>');
+    if (t.pullins) chips.push(`<span class="ih-chip">Pulled in ${t.pullins}&times;</span>`);
+    chips.push(`<span class="ih-chip">${t.statusChanges} status change${t.statusChanges === 1 ? '' : 's'}</span>`);
+
+    const note = t.trackable ? '' :
+      '<p class="issue-history-note">This item has no DevOps #, so it can\'t be matched across RAID log uploads. Only edits made in this tracker are shown.</p>';
+
+    if (!t.events.length) {
+      return `<div class="issue-history-title">History</div>${note}
+        <p class="issue-history-note">No recorded history yet. Changes will appear here after the next RAID log upload or tracker edit.</p>`;
+    }
+
+    const items = t.events.slice().reverse().map(ev => {
+      let body = '';
+      if (ev.note) body += `<div class="ih-change">${esc(ev.note)}</div>`;
+      if (ev.initial) {
+        body += `<div class="ih-change"><span class="ih-field">Status:</span> ${esc(historyValueLabel(HISTORY_FIELDS[0], ev.initial.status))}
+          &middot; <span class="ih-field">Target:</span> ${esc(historyValueLabel(HISTORY_FIELDS[1], ev.initial.targetDate))}</div>`;
+      }
+      (ev.changes || []).forEach(c => { body += renderHistoryChange(c); });
+      return `<li class="ih-event${ev.slip ? ' slip' : ''}">
+        <div class="ih-when"><span>${ev.at ? esc(formatDateTime(ev.at)) : 'Date not recorded'}</span><span class="ih-source">${esc(ev.source)}</span></div>
+        ${body}
+      </li>`;
+    }).join('');
+
+    return `<div class="issue-history-title">History <span style="font-weight:400;color:var(--ink-soft);">(${t.events.length} event${t.events.length === 1 ? '' : 's'})</span></div>
+      <div class="issue-history-summary">${chips.join('')}</div>
+      ${note}
+      <ul class="ih-list">${items}</ul>`;
+  }
+
+  async function showIssueHistory(container, issue) {
+    container.innerHTML = '<p class="issue-history-note">Loading history&hellip;</p>';
+    let snapshots = [];
+    let loadError = false;
+    if (isTrackableId(issue.id)) {
+      try { snapshots = await loadAllSnapshotDetails(); }
+      catch (e) { loadError = true; console.error(e); }
+    }
+    if (!container.isConnected) return; // modal closed while loading
+    container.innerHTML = renderIssueHistoryHtml(issue, buildIssueTimeline(issue, snapshots)) +
+      (loadError ? '<p class="issue-history-note">Upload history couldn\'t be loaded, so only tracker edits are shown.</p>' : '');
+  }
+
+  // ---------- FDD (Functional Design Document) tracker ----------
+  //
+  // An item is "FDD-related" if the word "FDD" shows up anywhere relevant
+  // to it — the title, the target date field (which sometimes holds a
+  // placeholder like "FDD to be created" instead of a real date), or the
+  // detail/notes text. That single check also naturally covers an FDD ID
+  // like "FDD 17676" appearing anywhere in that text.
+  function fddSearchText(issue) {
+    return [issue.title, issue.detail, issue.notes, issue.targetDate].filter(Boolean).join(' ');
+  }
+
+  function isFddItem(issue) {
+    return /FDD/i.test(fddSearchText(issue));
+  }
+
+  // Pulls the first FDD number found (e.g. "FDD 17676", "FDD#17676",
+  // "FDD-17676") out of the item's text. Returns null if none is found,
+  // so the caller can show "FDD# REQUIRED" instead.
+  function extractFddNumber(issue) {
+    const m = fddSearchText(issue).match(/FDD\s*#?\s*-?\s*(\d{3,6})/i);
+    return m ? m[1] : null;
+  }
+
+  function formatFileSize(bytes) {
+    if (bytes == null) return '';
+    return bytes > 1024 * 1024 ? (bytes / (1024 * 1024)).toFixed(1) + ' MB' : Math.max(1, Math.round(bytes / 1024)) + ' KB';
+  }
+
+  // Reads a File as base64 (stripping the "data:<mime>;base64," prefix
+  // that FileReader's readAsDataURL includes) so it can be sent as plain
+  // JSON text to /api/fdd/<issueId>.
+  function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result || '';
+        const idx = result.indexOf(',');
+        resolve(idx !== -1 ? result.slice(idx + 1) : result);
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // Reverses that — turns base64 text fetched back from the server into a
+  // blob URL the <iframe>/download link can actually use.
+  function base64ToBlobUrl(base64, contentType) {
+    const byteChars = atob(base64);
+    const byteNumbers = new Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+    const blob = new Blob([new Uint8Array(byteNumbers)], { type: contentType || 'application/octet-stream' });
+    return URL.createObjectURL(blob);
+  }
+
+  function renderFddItemsList(fddItems) {
+    if (!fddItems.length) {
+      return '<div class="empty">No FDD-related items match the current filters. An item is picked up here when "FDD" appears in its title, target date, or notes/description — including an FDD ID like "FDD 17676".</div>';
+    }
+    const sorted = fddItems.slice().sort((a, b) => {
+      const statusDiff = STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status);
+      return statusDiff !== 0 ? statusDiff : a.title.localeCompare(b.title);
+    });
+    return `
+      <table class="fdd-table">
+        <thead><tr><th>Issue</th><th>FDD #</th><th>Status</th><th>Target</th><th>FDD Document</th></tr></thead>
+        <tbody>
+          ${sorted.map(i => {
+            const fddNum = extractFddNumber(i);
+            const doc = fddDocs[i.id];
+            const isExpanded = expandedFddId === i.id && doc && doc.blobUrl;
+            return `
+              <tr data-id="${i.id}">
+                <td>
+                  <strong>${i.title}</strong><br><span style="color:var(--ink-soft);font-size:12px;">${i.detail}</span>
+                </td>
+                <td>${fddNum ? `FDD ${fddNum}` : '<span class="status-pill unmatched">FDD# REQUIRED</span>'}</td>
+                <td><span class="status-pill ${i.status}">${STATUS_LABELS[i.status]}</span></td>
+                <td>${i.targetDate ? formatDate(i.targetDate) : '—'}</td>
+                <td>${renderFddRowUploadCell(i)}</td>
+              </tr>
+              ${isExpanded ? `<tr class="fdd-detail-row"><td colspan="5">${renderFddPreview(doc)}</td></tr>` : ''}
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    `;
+  }
+
+  // Per-item upload control — each FDD-related line item gets its own file
+  // slot, since a given RAID/FDD item is reviewed against its own specific
+  // document, not a single document for the whole tracker.
+  function renderFddRowUploadCell(issue) {
+    const doc = fddDocs[issue.id];
+    if (!doc) {
+      return `
+        <div class="fdd-row-controls">
+          <input type="file" class="fdd-row-upload-input" data-fdd-issue-id="${issue.id}" accept=".pdf,.doc,.docx">
+        </div>
+      `;
+    }
+    if (doc.uploading) {
+      return `<div class="fdd-row-controls"><span class="fdd-row-file-size">Uploading&hellip;</span></div>`;
+    }
+    const viewing = expandedFddId === issue.id;
+    const viewLabel = doc.loading ? 'Loading&hellip;' : (viewing ? 'Hide' : 'View');
+    return `
+      <div class="fdd-row-controls fdd-row-file">
+        <span class="fdd-row-file-name" title="${doc.filename}">${doc.filename}</span>
+        <span class="fdd-row-file-size">(${formatFileSize(doc.size)})</span>
+        <button type="button" class="btn-secondary fdd-row-view-btn" data-fdd-view-id="${issue.id}"${doc.loading ? ' disabled' : ''}>${viewLabel}</button>
+        <button type="button" class="history-delete-btn fdd-row-remove-btn" data-fdd-remove-id="${issue.id}" title="Remove this file">&times;</button>
+      </div>
+    `;
+  }
+
+  function renderFddPreview(doc) {
+    const canPreviewInline = doc.contentType === 'application/pdf';
+    return canPreviewInline
+      ? `<iframe src="${doc.blobUrl}" class="fdd-preview-frame" title="FDD preview"></iframe>`
+      : `<div class="empty">Preview isn't available for this file type in-browser. <a href="${doc.blobUrl}" download="${doc.filename}">Download ${doc.filename}</a> to view it.</div>`;
+  }
+
+  // Redraws just the FDD tab's body content and (re)wires its controls —
+  // called both after the initial server load and after any local action
+  // (upload/view/remove), without needing to hit the network again except
+  // where the action itself requires it (see the handlers below).
+  function renderFddBody(list) {
+    const body = document.getElementById('body');
+    const fddItems = list.filter(i => isFddItem(i) && i.status !== 'closed');
+    body.innerHTML = `
+      <div class="history-wrap">
+        <div class="history-header">FDD Tracker <span class="count">(${fddItems.length} item${fddItems.length === 1 ? '' : 's'})</span></div>
+        <p class="history-hint">Items are matched automatically when "FDD" appears in the title, target date, or notes/description — including an FDD ID like "FDD 17676" (Closed items are left off this list). Upload each item's FDD document in its own row — files are saved to the shared tracker (up to ~8 MB each) so everyone sees the same document.</p>
+        ${renderFddItemsList(fddItems)}
+      </div>
+    `;
+
+    body.querySelectorAll('[data-id]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        if (e.target.closest('.fdd-row-controls')) return;
+        openModal(el.getAttribute('data-id'));
+      });
+    });
+
+    body.querySelectorAll('.fdd-row-upload-input').forEach(input => {
+      input.addEventListener('click', (e) => e.stopPropagation());
+      input.addEventListener('change', async () => {
+        const file = input.files[0];
+        if (!file) return;
+        const issueId = input.getAttribute('data-fdd-issue-id');
+        if (file.size > MAX_FDD_FILE_BYTES) {
+          showAlertModal(`That file is too large to store (limit is roughly ${Math.round(MAX_FDD_FILE_BYTES / (1024 * 1024))} MB). Try a smaller file.`);
+          input.value = '';
+          return;
+        }
+        fddDocs[issueId] = { uploading: true };
+        renderFddBody(getFiltered());
+        try {
+          const base64 = await readFileAsBase64(file);
+          const res = await fetch('/api/fdd/' + encodeURIComponent(issueId), {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename: file.name, contentType: file.type, size: file.size, data: base64 }),
+          });
+          if (!res.ok) throw new Error('Upload failed: ' + res.status);
+          const payload = await res.json();
+          fddDocs[issueId] = {
+            filename: file.name,
+            contentType: file.type,
+            size: file.size,
+            uploadedAt: payload.uploadedAt || new Date().toISOString(),
+            blobUrl: URL.createObjectURL(file),
+            loaded: true,
+          };
+          expandedFddId = issueId;
+        } catch (e) {
+          console.error('FDD upload failed', e);
+          delete fddDocs[issueId];
+          showAlertModal('Could not upload that file — please try again.');
+        }
+        renderFddBody(getFiltered());
+      });
+    });
+
+    body.querySelectorAll('.fdd-row-view-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const issueId = btn.getAttribute('data-fdd-view-id');
+        if (expandedFddId === issueId) {
+          expandedFddId = null;
+          renderFddBody(getFiltered());
+          return;
+        }
+        const doc = fddDocs[issueId];
+        if (doc && !doc.loaded && !doc.loading) {
+          doc.loading = true;
+          renderFddBody(getFiltered());
+          try {
+            const res = await fetch('/api/fdd/' + encodeURIComponent(issueId));
+            if (!res.ok) throw new Error('Failed to load: ' + res.status);
+            const payload = await res.json();
+            doc.blobUrl = base64ToBlobUrl(payload.data, payload.contentType);
+            doc.loaded = true;
+          } catch (err) {
+            console.error('FDD load failed', err);
+            doc.loading = false;
+            renderFddBody(getFiltered());
+            showAlertModal('Could not load that FDD file — please try again.');
+            return;
+          }
+          doc.loading = false;
+        }
+        expandedFddId = issueId;
+        renderFddBody(getFiltered());
+      });
+    });
+
+    body.querySelectorAll('.fdd-row-remove-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const issueId = btn.getAttribute('data-fdd-remove-id');
+        showConfirmModal(
+          'Remove this FDD file? This deletes it from the shared tracker for everyone.',
+          async () => {
+            try {
+              await fetch('/api/fdd/' + encodeURIComponent(issueId), { method: 'DELETE' });
+            } catch (err) {
+              console.error('FDD delete failed', err);
+            }
+            const existing = fddDocs[issueId];
+            if (existing && existing.blobUrl) URL.revokeObjectURL(existing.blobUrl);
+            delete fddDocs[issueId];
+            if (expandedFddId === issueId) expandedFddId = null;
+            renderFddBody(getFiltered());
+          },
+          'Remove'
+        );
+      });
+    });
+  }
+
+  // Entry point for the FDD tab — fetches the current file metadata from
+  // the server (so a page refresh, or another person's upload, shows up
+  // correctly) and merges it into the local cache without clobbering a
+  // blobUrl already fetched/created earlier in this same session.
+  async function loadAndRenderFddView(list) {
+    let files;
+    try {
+      const res = await fetch('/api/fdd');
+      if (!res.ok) throw new Error('Failed to load: ' + res.status);
+      const payload = await res.json();
+      files = payload.files || [];
+    } catch (e) {
+      if (currentView === 'fdd') {
+        document.getElementById('body').innerHTML = '<div class="empty">Could not load FDD documents.</div>';
+      }
+      return;
+    }
+    if (currentView !== 'fdd') return;
+
+    const serverIds = new Set(files.map(f => f.issueId));
+    files.forEach(f => {
+      const existing = fddDocs[f.issueId];
+      fddDocs[f.issueId] = {
+        filename: f.filename,
+        contentType: f.contentType,
+        size: f.size,
+        uploadedAt: f.uploadedAt,
+        loaded: existing ? existing.loaded : false,
+        blobUrl: existing ? existing.blobUrl : undefined,
+      };
+    });
+    // Drop cached entries for files removed server-side (e.g. by someone
+    // else, or in another tab).
+    Object.keys(fddDocs).forEach(id => {
+      if (!serverIds.has(id)) {
+        if (fddDocs[id] && fddDocs[id].blobUrl) URL.revokeObjectURL(fddDocs[id].blobUrl);
+        delete fddDocs[id];
+      }
+    });
+
+    renderFddBody(list);
+  }
+
+  // ---------- History (upload snapshots) ----------
+
+  // An issue's id is 'devops-<number>' when it has a DevOps #, or
+  // 'nodevops-...' when it doesn't (see transformRaidRow). Only
+  // 'devops-' ids are meaningful to match across uploads — RAID # is just
+  // a spreadsheet row position and was dropped as the join key because it
+  // isn't stable across uploads (rows get added/removed/resorted), and a
+  // 'nodevops-' id is deliberately unique per upload (never matches
+  // anything, past or future), so those items must never be silently
+  // counted as "new" or "removed" — they're surfaced separately instead.
+  function isTrackableId(id) {
+    return typeof id === 'string' && id.indexOf('devops-') === 0;
+  }
+
+  function diffSnapshotItems(older, newer) {
+    const olderTrackable = older.filter(i => isTrackableId(i.id));
+    const newerTrackable = newer.filter(i => isTrackableId(i.id));
+    const olderMap = new Map(olderTrackable.map(i => [i.id, i]));
+    const newerMap = new Map(newerTrackable.map(i => [i.id, i]));
+    const added = [];
+    const removed = [];
+    const statusChanged = [];
+    const dateChanged = [];
+    newerMap.forEach((item, id) => {
+      if (!olderMap.has(id)) {
+        added.push(item);
+        return;
+      }
+      const older = olderMap.get(id);
+      if (older.status !== item.status) {
+        statusChanged.push({ item, from: older.status, to: item.status });
+      }
+      // Target date is tracked independently of status — an item can sit
+      // in the same status across uploads while its due date quietly
+      // moves, and that's exactly the case this is meant to catch.
+      if ((older.targetDate || '') !== (item.targetDate || '')) {
+        dateChanged.push({ item, from: older.targetDate, to: item.targetDate });
+      }
+    });
+    olderMap.forEach((item, id) => {
+      if (!newerMap.has(id)) removed.push(item);
+    });
+    // Items with no DevOps # in the NEWER upload can't be matched against
+    // anything (they've got a one-time-use id), so they're neither "added"
+    // nor "removed" — just flagged so they don't get miscounted either way.
+    // Only flagged when the item is in one of the active Board statuses
+    // (Open, In Progress, Testing, Ready for Customer, Ready for Install) —
+    // Monitoring/On Hold/Closed items aren't worth calling out here.
+    const unmatched = newer.filter(i => !isTrackableId(i.id) && BOARD_STATUS_ORDER.includes(i.status));
+    return { added, removed, statusChanged, dateChanged, unmatched };
+  }
+
+  // A due-date change only counts as a "slip" or "pull-in" when both the
+  // old and new values are real ISO dates — comparing "TBD" to "TBD" or
+  // to a real date isn't a meaningful direction, just a text change.
+  function dateChangeDirection(fromDate, toDate) {
+    const fromValid = isIsoDate(fromDate);
+    const toValid = isIsoDate(toDate);
+    if (!fromValid || !toValid) return null;
+    if (toDate > fromDate) return 'slip';
+    if (toDate < fromDate) return 'pullin';
+    return null;
+  }
+
+  function dateChangeLabel(iso) {
+    if (!iso) return 'No due date';
+    return formatDate(iso);
+  }
+
+  async function loadAndRenderHistory() {
+    const body = document.getElementById('body');
+    let snapshots;
+    try {
+      const res = await fetch('/api/snapshots');
+      if (!res.ok) throw new Error('Failed to load history: ' + res.status);
+      const payload = await res.json();
+      snapshots = payload.snapshots || [];
+    } catch (e) {
+      if (currentView === 'history') {
+        body.innerHTML = '<div class="empty">Could not load upload history.</div>';
+      }
+      return;
+    }
+
+    if (currentView !== 'history') return; // view changed while loading
+
+    if (!snapshots.length) {
+      body.innerHTML = `
+        <div class="history-wrap">
+          <div class="history-header">Upload History</div>
+          <div class="empty">No RAID log uploads recorded yet. Use "Upload RAID Log" to start building history.</div>
+        </div>
+      `;
+      return;
+    }
+
+    body.innerHTML = `
+      <div class="history-wrap">
+        <div class="history-header">Upload History <span class="count">(${snapshots.length} upload${snapshots.length === 1 ? '' : 's'})</span></div>
+        <div class="empty">Loading item-level comparisons&hellip;</div>
+      </div>
+    `;
+
+    // Fetch full item-level detail for every upload so we can compute a
+    // New Items count and a full diff for every consecutive pair, not
+    // just the two most recent — a click on any row (other than the very
+    // first/oldest) expands to show exactly what changed since the
+    // upload right before it.
+    let details;
+    try {
+      details = await Promise.all(snapshots.map(s => fetch('/api/snapshots/' + s.id).then(r => r.json())));
+    } catch (e) {
+      details = null;
+    }
+    if (currentView !== 'history') return;
+
+    const detailById = {};
+    if (details) details.forEach(d => { if (d && d.id) detailById[d.id] = d; });
+
+    // snapshots is newest-first; pair each row with the one right after it
+    // in the array (i.e. chronologically just before it) to diff against.
+    const diffs = {}; // snapshot id -> diff vs the previous upload
+    for (let i = 0; i < snapshots.length - 1; i++) {
+      const newer = detailById[snapshots[i].id];
+      const older = detailById[snapshots[i + 1].id];
+      if (newer && older) diffs[snapshots[i].id] = diffSnapshotItems(older.issues, newer.issues);
+    }
+
+    // Every snapshot (including the oldest, which has no "previous" to
+    // diff against) still gets its own no-DevOps# count, since that's a
+    // property of the upload itself, not of a comparison between two.
+    const noDevopsCounts = {};
+    snapshots.forEach(s => {
+      const d = detailById[s.id];
+      // Only Monitoring/On Hold/Closed items are excluded — nothing left worth tracking there.
+      noDevopsCounts[s.id] = d ? d.issues.filter(i => !isTrackableId(i.id) && BOARD_STATUS_ORDER.includes(i.status)).length : 0;
+    });
+
+    const tableRows = snapshots.map((s, i) => {
+      const c = s.statusCounts;
+      const diff = diffs[s.id];
+      const isOldest = i === snapshots.length - 1;
+      const newItemsCell = isOldest ? '&mdash;' : (diff ? diff.added.length : '&hellip;');
+      const clickable = !isOldest;
+      const noDevopsCell = noDevopsCounts[s.id] || 0;
+      return `
+        <tr class="history-row${clickable ? ' clickable' : ''}" data-snapshot-id="${s.id}">
+          <td>${clickable ? '<span class="history-expand-caret">&#9656;</span>' : ''}${formatDateTime(s.uploadedAt)}</td>
+          <td>${s.itemCount}</td>
+          <td>${newItemsCell}</td>
+          <td>${noDevopsCell ? `<span class="status-pill unmatched" title="Items in this upload with no DevOps # — can't be tracked across uploads">${noDevopsCell}</span>` : '&mdash;'}</td>
+          <td>${c.open || 0}</td>
+          <td>${c.inprogress || 0}</td>
+          <td>${c.testing || 0}</td>
+          <td>${c.monitoring || 0}</td>
+          <td>${c.onhold || 0}</td>
+          <td>${c.closed || 0}</td>
+          <td><button type="button" class="history-delete-btn" data-snapshot-id="${s.id}" title="Delete this upload record">&times;</button></td>
+        </tr>
+        <tr class="history-detail-row" data-detail-for="${s.id}" style="display:none;"><td colspan="11"></td></tr>
+      `;
+    }).join('');
+
+    body.innerHTML = `
+      <div class="history-wrap">
+        <div class="history-header">Upload History <span class="count">(${snapshots.length} upload${snapshots.length === 1 ? '' : 's'})</span></div>
+        <p class="history-hint">Click any upload to see exactly what changed since the one before it. "No DevOps #" items can't be matched across uploads, so they're never counted as new or removed.</p>
+        <table class="history-table">
+          <thead><tr><th>Uploaded</th><th>Items</th><th>New Items</th><th>No DevOps #</th><th>Open</th><th>In Progress</th><th>Testing</th><th>Monitoring</th><th>On Hold</th><th>Closed</th><th></th></tr></thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </div>
+    `;
+
+    body.querySelectorAll('.history-row.clickable').forEach(row => {
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('.history-delete-btn')) return;
+        const id = row.getAttribute('data-snapshot-id');
+        const detailRow = body.querySelector(`.history-detail-row[data-detail-for="${id}"]`);
+        if (!detailRow) return;
+        const isOpen = detailRow.style.display !== 'none';
+        if (isOpen) {
+          detailRow.style.display = 'none';
+          row.classList.remove('expanded');
+          return;
+        }
+        // Collapse any other open row first, so only one is expanded at a time.
+        body.querySelectorAll('.history-detail-row').forEach(dr => { dr.style.display = 'none'; });
+        body.querySelectorAll('.history-row.expanded').forEach(r => r.classList.remove('expanded'));
+
+        const idx = snapshots.findIndex(s => String(s.id) === String(id));
+        const diff = diffs[id];
+        const cell = detailRow.querySelector('td');
+        if (diff && idx !== -1 && idx < snapshots.length - 1) {
+          cell.innerHTML = renderHistoryDiff(diff, snapshots[idx + 1].uploadedAt, snapshots[idx].uploadedAt);
+        } else {
+          cell.innerHTML = '<div class="history-diff-section"><div class="history-diff-summary">Comparison unavailable.</div></div>';
+        }
+        detailRow.style.display = '';
+        row.classList.add('expanded');
+      });
+    });
+
+    body.querySelectorAll('.history-delete-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = btn.getAttribute('data-snapshot-id');
+        showConfirmModal(
+          'Delete this upload record from History? This only removes it from the History log — it does not change your current tracker data.',
+          async () => {
+            try {
+              await fetch('/api/snapshots/' + id, { method: 'DELETE' });
+            } catch (e) {
+              console.error('Delete snapshot failed', e);
+            }
+            if (currentView === 'history') loadAndRenderHistory();
+          },
+          'Delete'
+        );
+      });
+    });
+  }
+
+  function renderHistoryDiff(diff, fromDate, toDate) {
+    const { added, removed, statusChanged, dateChanged, unmatched } = diff;
+    const dc = dateChanged || [];
+    if (!added.length && !removed.length && !statusChanged.length && !dc.length && !(unmatched && unmatched.length)) {
+      return `<div class="history-diff-section"><div class="history-diff-title">Since ${formatDateTime(fromDate)}</div><div class="history-diff-summary">No changes between these two uploads.</div></div>`;
+    }
+    const changeRows = statusChanged.map(c => `
+      <div class="history-diff-item">
+        <span class="status-pill ${c.from}">${STATUS_LABELS[c.from] || c.from}</span>
+        <span class="history-diff-arrow">&rarr;</span>
+        <span class="status-pill ${c.to}">${STATUS_LABELS[c.to] || c.to}</span>
+        <span class="history-diff-item-title">${c.item.title}</span>
+      </div>
+    `).join('');
+    const dateRows = dc.map(c => {
+      const direction = dateChangeDirection(c.from, c.to);
+      const toClass = direction === 'slip' ? 'target-tag target-tag-late' : 'target-tag';
+      const directionLabel = direction === 'slip' ? ' <span style="color:var(--rust);font-weight:600;">(pushed out)</span>' : direction === 'pullin' ? ' <span style="color:var(--moss);font-weight:600;">(pulled in)</span>' : '';
+      return `
+      <div class="history-diff-item">
+        <span class="target-tag">${dateChangeLabel(c.from)}</span>
+        <span class="history-diff-arrow">&rarr;</span>
+        <span class="${toClass}">${dateChangeLabel(c.to)}</span>
+        <span class="history-diff-item-title">${c.item.title}${directionLabel}</span>
+      </div>
+    `;
+    }).join('');
+    const addedRows = added.map(i => `<div class="history-diff-item"><span class="status-pill ${i.status}">New</span><span class="history-diff-item-title">${i.title}</span></div>`).join('');
+    const removedRows = removed.map(i => `<div class="history-diff-item"><span class="status-pill closed">Removed</span><span class="history-diff-item-title">${i.title}</span></div>`).join('');
+    const unmatchedRows = (unmatched || []).map(i => `<div class="history-diff-item"><span class="status-pill unmatched">No DevOps #</span><span class="history-diff-item-title">${i.title}</span></div>`).join('');
+    return `
+      <div class="history-diff-section">
+        <div class="history-diff-title">Since ${formatDateTime(fromDate)}</div>
+        <div class="history-diff-summary">${added.length} new &middot; ${removed.length} removed &middot; ${statusChanged.length} changed status${dc.length ? ` &middot; ${dc.length} due date change${dc.length === 1 ? '' : 's'}` : ''}${unmatched && unmatched.length ? ` &middot; ${unmatched.length} unmatched (no DevOps #)` : ''}</div>
+        ${statusChanged.length ? `<div class="history-diff-list">${changeRows}</div>` : ''}
+        ${dc.length ? `<div class="history-diff-list">${dateRows}</div>` : ''}
+        ${added.length ? `<div class="history-diff-list">${addedRows}</div>` : ''}
+        ${removed.length ? `<div class="history-diff-list">${removedRows}</div>` : ''}
+        ${unmatched && unmatched.length ? `<div class="history-diff-list">${unmatchedRows}</div>` : ''}
+      </div>
+    `;
+  }
+
+  function formatDateTime(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  }
+
+  function shortDateLabel(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+
+  // ---------- Analysis (trend charts, closure velocity, stuck items) ----------
+
+  // A minimal hand-rolled SVG line chart — no charting library dependency,
+  // since this needs to keep working as a single self-contained file.
+  // Assumes every series shares the same x positions (one point per
+  // upload, evenly spaced by index rather than true elapsed time — good
+  // enough for "is this trending up or down", and avoids the complexity
+  // of a real time-scaled axis for what's usually a handful of uploads).
+  function renderLineChartSVG(series, xLabels) {
+    const width = 640, height = 220;
+    const padL = 42, padR = 16, padT = 16, padB = 28;
+    const plotW = width - padL - padR;
+    const plotH = height - padT - padB;
+    const n = xLabels.length;
+
+    let yMax = 0;
+    series.forEach(s => s.points.forEach(v => { if (v > yMax) yMax = v; }));
+    const rawStep = Math.max(1, yMax * 1.15) / 4;
+    const mag = Math.pow(10, Math.floor(Math.log10(rawStep || 1)));
+    const step = Math.max(1, Math.ceil(rawStep / mag) * mag);
+    yMax = step * 4;
+
+    const xAt = (i) => n <= 1 ? padL + plotW / 2 : padL + (plotW * i) / (n - 1);
+    const yAt = (v) => padT + plotH - (plotH * v) / yMax;
+
+    let gridLines = '';
+    for (let g = 0; g <= 4; g++) {
+      const v = step * g;
+      const y = yAt(v);
+      gridLines += `<line x1="${padL}" y1="${y}" x2="${width - padR}" y2="${y}" stroke="#dcd8cc" stroke-width="1"/>`;
+      gridLines += `<text x="${padL - 8}" y="${y + 4}" font-size="11" fill="#565f6c" text-anchor="end">${Math.round(v)}</text>`;
+    }
+
+    let xTicks = '';
+    const tickEvery = n > 8 ? Math.ceil(n / 8) : 1;
+    xLabels.forEach((lbl, i) => {
+      if (i % tickEvery !== 0 && i !== n - 1) return;
+      xTicks += `<text x="${xAt(i)}" y="${height - 8}" font-size="10.5" fill="#565f6c" text-anchor="middle">${lbl}</text>`;
+    });
+
+    let lines = '';
+    let legend = '';
+    series.forEach((s) => {
+      const pts = s.points.map((v, i) => `${xAt(i)},${yAt(v)}`).join(' ');
+      lines += `<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+      s.points.forEach((v, i) => { lines += `<circle cx="${xAt(i)}" cy="${yAt(v)}" r="3" fill="${s.color}"/>`; });
+      legend += `<span class="chart-legend-item"><span class="chart-legend-swatch" style="background:${s.color};"></span>${s.name}</span>`;
+    });
+
+    return `
+      <div class="chart-wrap">
+        <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;max-width:${width}px;display:block;">
+          ${gridLines}
+          <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT + plotH}" stroke="#565f6c" stroke-width="1"/>
+          <line x1="${padL}" y1="${padT + plotH}" x2="${width - padR}" y2="${padT + plotH}" stroke="#565f6c" stroke-width="1"/>
+          ${lines}
+          ${xTicks}
+        </svg>
+        <div class="chart-legend">${legend}</div>
+      </div>
+    `;
+  }
+
+  // A matching hand-rolled SVG bar chart, styled the same as the line
+  // chart above (same grid/axis look), for single-series counts like New
+  // Items per upload.
+  function renderBarChartSVG(values, xLabels, color) {
+    const width = 640, height = 220;
+    const padL = 42, padR = 16, padT = 16, padB = 28;
+    const plotW = width - padL - padR;
+    const plotH = height - padT - padB;
+    const n = xLabels.length;
+
+    let yMax = 0;
+    values.forEach(v => { if (v > yMax) yMax = v; });
+    const rawStep = Math.max(1, yMax * 1.15) / 4;
+    const mag = Math.pow(10, Math.floor(Math.log10(rawStep || 1)));
+    const step = Math.max(1, Math.ceil(rawStep / mag) * mag);
+    yMax = step * 4;
+
+    const yAt = (v) => padT + plotH - (plotH * v) / yMax;
+
+    let gridLines = '';
+    for (let g = 0; g <= 4; g++) {
+      const v = step * g;
+      const y = yAt(v);
+      gridLines += `<line x1="${padL}" y1="${y}" x2="${width - padR}" y2="${y}" stroke="#dcd8cc" stroke-width="1"/>`;
+      gridLines += `<text x="${padL - 8}" y="${y + 4}" font-size="11" fill="#565f6c" text-anchor="end">${Math.round(v)}</text>`;
+    }
+
+    const slotW = n > 0 ? plotW / n : plotW;
+    const barW = Math.max(4, slotW * 0.55);
+
+    let bars = '';
+    values.forEach((v, i) => {
+      const x = padL + slotW * i + (slotW - barW) / 2;
+      const y = yAt(v);
+      const h = (padT + plotH) - y;
+      bars += `<rect x="${x}" y="${y}" width="${barW}" height="${Math.max(0, h)}" fill="${color}" rx="2"/>`;
+      if (h > 14) {
+        bars += `<text x="${x + barW / 2}" y="${y - 5}" font-size="10.5" fill="#565f6c" text-anchor="middle">${v}</text>`;
+      }
+    });
+
+    let xTicks = '';
+    const tickEvery = n > 8 ? Math.ceil(n / 8) : 1;
+    xLabels.forEach((lbl, i) => {
+      if (i % tickEvery !== 0 && i !== n - 1) return;
+      const x = padL + slotW * i + slotW / 2;
+      xTicks += `<text x="${x}" y="${height - 8}" font-size="10.5" fill="#565f6c" text-anchor="middle">${lbl}</text>`;
+    });
+
+    return `
+      <div class="chart-wrap">
+        <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;max-width:${width}px;display:block;">
+          ${gridLines}
+          <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT + plotH}" stroke="#565f6c" stroke-width="1"/>
+          <line x1="${padL}" y1="${padT + plotH}" x2="${width - padR}" y2="${padT + plotH}" stroke="#565f6c" stroke-width="1"/>
+          ${bars}
+          ${xTicks}
+        </svg>
+      </div>
+    `;
+  }
+
+  // A minimal hand-rolled SVG pie chart, matching the look of the other
+  // charts. series is [{ name, color, value }, ...]. Slices with a value
+  // of 0 are skipped entirely (no zero-width slivers).
+  function renderPieChartSVG(series) {
+    const width = 190, height = 190;
+    const cx = width / 2, cy = height / 2, r = 78;
+    const total = series.reduce((sum, s) => sum + s.value, 0);
+
+    let slices = '';
+    let legend = '';
+    if (total <= 0) {
+      slices = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#eceae2"/>`;
+    } else {
+      let startAngle = -Math.PI / 2; // start at 12 o'clock
+      series.forEach((s) => {
+        legend += `<span class="chart-legend-item"><span class="chart-legend-swatch" style="background:${s.color};"></span>${s.name} (${s.value})</span>`;
+        if (s.value <= 0) return;
+        const fraction = s.value / total;
+        // A slice covering the full circle (only one non-zero status)
+        // needs a plain circle — a 360° arc path has coincident start/end
+        // points and won't render as a filled wedge.
+        if (fraction >= 0.9999) {
+          slices += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${s.color}"/>`;
+          return;
+        }
+        const endAngle = startAngle + fraction * 2 * Math.PI;
+        const x1 = cx + r * Math.cos(startAngle);
+        const y1 = cy + r * Math.sin(startAngle);
+        const x2 = cx + r * Math.cos(endAngle);
+        const y2 = cy + r * Math.sin(endAngle);
+        const largeArc = (endAngle - startAngle) > Math.PI ? 1 : 0;
+        slices += `<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${largeArc} 1 ${x2},${y2} Z" fill="${s.color}" stroke="#ffffff" stroke-width="1.5"/>`;
+        startAngle = endAngle;
+      });
+    }
+
+    return `
+      <div class="chart-wrap chart-wrap-pie">
+        <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;max-width:${width}px;display:block;flex-shrink:0;">
+          ${slices}
+        </svg>
+        <div class="chart-legend chart-legend-side">${legend}</div>
+      </div>
+    `;
+  }
+
+  async function loadAndRenderAnalysis() {
+    const body = document.getElementById('body');
+    let snapshots;
+    try {
+      const res = await fetch('/api/snapshots');
+      if (!res.ok) throw new Error('Failed to load: ' + res.status);
+      const payload = await res.json();
+      snapshots = payload.snapshots || [];
+    } catch (e) {
+      if (currentView === 'analysis') body.innerHTML = '<div class="empty">Could not load upload history for analysis.</div>';
+      return;
+    }
+    if (currentView !== 'analysis') return;
+
+    if (snapshots.length < 2) {
+      body.innerHTML = `
+        <div class="analysis-wrap">
+          <div class="analysis-header">Analysis</div>
+          <div class="empty">Need at least 2 uploads to show trends. Upload another RAID log to start building this out.</div>
+        </div>
+      `;
+      return;
+    }
+
+    body.innerHTML = '<div class="empty">Crunching item-level history&hellip;</div>';
+
+    let details;
+    try {
+      details = await Promise.all(snapshots.map(s => fetch('/api/snapshots/' + s.id).then(r => r.json())));
+    } catch (e) {
+      if (currentView === 'analysis') body.innerHTML = '<div class="empty">Could not load item-level history for analysis.</div>';
+      return;
+    }
+    if (currentView !== 'analysis') return;
+
+    const detailById = {};
+    details.forEach(d => { if (d && d.id) detailById[d.id] = d; });
+
+    // Chronological order (oldest first) for trend/velocity computation —
+    // the History view sorts newest-first, but trends read naturally left
+    // (past) to right (present).
+    const chrono = snapshots.slice().sort((a, b) => new Date(a.uploadedAt) - new Date(b.uploadedAt));
+    const xLabels = chrono.map(s => shortDateLabel(s.uploadedAt));
+
+    // Blocker count over time — not in statusCounts, so this needs
+    // the full item list per snapshot (already fetched above).
+    const blockerPoints = chrono.map(s => {
+      const d = detailById[s.id];
+      return d ? d.issues.filter(i => isBlocker(i.blocker)).length : 0;
+    });
+
+    // New Items per upload and Closures per upload, computed from the
+    // same interval-by-interval diff used for date-change tracking below.
+    const newItemsPerInterval = [];
+    const closuresPerInterval = [];
+    let totalDateSlips = 0;
+    let totalDatePullIns = 0;
+    const dateSlipItems = [];
+    const datePullInItems = [];
+    for (let i = 1; i < chrono.length; i++) {
+      const prevDetail = detailById[chrono[i - 1].id];
+      const curDetail = detailById[chrono[i].id];
+      if (!prevDetail || !curDetail) { newItemsPerInterval.push(0); closuresPerInterval.push(0); continue; }
+      const diff = diffSnapshotItems(prevDetail.issues, curDetail.issues);
+      newItemsPerInterval.push(diff.added.length);
+      closuresPerInterval.push(diff.statusChanged.filter(c => c.to === 'closed').length);
+      diff.dateChanged.forEach(c => {
+        const direction = dateChangeDirection(c.from, c.to);
+        const record = { title: c.item.title, id: c.item.id, from: c.from, to: c.to, uploadedAt: chrono[i].uploadedAt };
+        if (direction === 'slip') { totalDateSlips++; dateSlipItems.push(record); }
+        else if (direction === 'pullin') { totalDatePullIns++; datePullInItems.push(record); }
+      });
+    }
+    // Most recent change first within each list.
+    dateSlipItems.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
+    datePullInItems.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
+    // New Items / Closures charts share an x-axis: one bar per interval,
+    // labeled with the date of the NEWER upload in that pair — so it
+    // lines up with chrono.slice(1).
+    const newItemsXLabels = xLabels.slice(1);
+
+    // 2. Stuck items — for each currently-open issue, walk backward
+    // through uploads (newest to oldest) and count how many consecutive
+    // uploads it's held its CURRENT status. Only surfaced once an item
+    // has persisted across at least 2 uploads, so a single upload's
+    // items don't all show up as "stuck" on day one.
+    const newestFirst = chrono.slice().reverse();
+    const stuckItems = issues
+      .filter(i => i.status !== 'closed')
+      .map(issue => {
+        let streak = 0;
+        let sinceDate = null;
+        for (const snap of newestFirst) {
+          const d = detailById[snap.id];
+          if (!d) break;
+          const match = d.issues.find(x => x.id === issue.id);
+          if (!match || match.status !== issue.status) break;
+          streak++;
+          sinceDate = snap.uploadedAt;
+        }
+        const days = sinceDate ? Math.round((Date.now() - new Date(sinceDate)) / 86400000) : null;
+        return { issue, streak, sinceDate, days };
+      })
+      .filter(s => s.streak >= 2)
+      .sort((a, b) => b.streak - a.streak);
+
+    const renderDateChangeRows = (items) => items.map(r => `
+      <tr data-id="${r.id}">
+        <td>${r.title}</td>
+        <td>${formatDate(r.from)}</td>
+        <td>${formatDate(r.to)}</td>
+        <td>${formatDate(r.uploadedAt.slice(0, 10))}</td>
+      </tr>
+    `).join('');
+
+    const dueDateHtml = `
+      <div class="analysis-card">
+        <div class="analysis-card-title">Due Date Changes <span class="count">(across ${chrono.length} uploads)</span></div>
+        <div class="analysis-stat-row">
+          <div class="analysis-stat"><div class="analysis-stat-n" style="color:var(--rust);">${totalDateSlips}</div><div class="analysis-stat-l">Due dates pushed out</div></div>
+          <div class="analysis-stat"><div class="analysis-stat-n" style="color:var(--moss);">${totalDatePullIns}</div><div class="analysis-stat-l">Due dates pulled in</div></div>
+        </div>
+        <p class="history-hint" style="margin-top:10px;">Counted whenever an item's target date changed between two consecutive uploads and both dates were real (not "TBD" or similar). Click a row to open that item.</p>
+        ${dateSlipItems.length ? `
+          <div style="margin-top:4px;">
+            <div class="history-diff-title" style="color:var(--rust);">Pushed Out (${dateSlipItems.length})</div>
+            <table class="stuck-table">
+              <thead><tr><th>Issue</th><th>Was</th><th>Now</th><th>Seen in upload</th></tr></thead>
+              <tbody>${renderDateChangeRows(dateSlipItems)}</tbody>
+            </table>
+          </div>
+        ` : ''}
+        ${datePullInItems.length ? `
+          <div style="margin-top:${dateSlipItems.length ? '18px' : '4px'};">
+            <div class="history-diff-title" style="color:var(--moss);">Pulled In (${datePullInItems.length})</div>
+            <table class="stuck-table">
+              <thead><tr><th>Issue</th><th>Was</th><th>Now</th><th>Seen in upload</th></tr></thead>
+              <tbody>${renderDateChangeRows(datePullInItems)}</tbody>
+            </table>
+          </div>
+        ` : ''}
+        ${!dateSlipItems.length && !datePullInItems.length ? `<div class="empty">No due date changes detected yet between consecutive uploads.</div>` : ''}
+      </div>
+    `;
+
+    const newItemsHtml = `
+      <div class="analysis-card">
+        <div class="analysis-card-title">New Items per Upload</div>
+        ${renderBarChartSVG(newItemsPerInterval, newItemsXLabels, '#a3402f')}
+      </div>
+    `;
+
+    const closuresHtml = `
+      <div class="analysis-card">
+        <div class="analysis-card-title">Closures per Upload</div>
+        ${renderBarChartSVG(closuresPerInterval, newItemsXLabels, '#4a6b4d')}
+      </div>
+    `;
+
+    // Current status breakdown — the same five statuses shown as Board
+    // columns, using live current data (not per-upload history like the
+    // other charts). Late and Walmart Blocker are flags on an item, not
+    // statuses, so they're intentionally left out.
+    const STATUS_PIE_COLORS = {
+      open: '#a3402f',
+      inprogress: '#c4791f',
+      testing: '#3d5a73',
+      readycustomer: '#4a6b4d',
+      readyinstall: '#6b7280',
+    };
+    const statusPieSeries = BOARD_STATUS_ORDER.map(st => ({
+      name: STATUS_LABELS[st],
+      color: STATUS_PIE_COLORS[st],
+      value: issues.filter(i => i.status === st).length,
+    }));
+    const statusPieHtml = `
+      <div class="analysis-card analysis-card-pie">
+        <div class="analysis-card-title">Current Status Breakdown</div>
+        ${renderPieChartSVG(statusPieSeries)}
+      </div>
+    `;
+
+    const stuckHtml = stuckItems.length ? `
+      <div class="analysis-card">
+        <div class="analysis-card-title">Stuck Items <span class="count">(${stuckItems.length})</span></div>
+        <p class="history-hint">Items that have held the same status across multiple uploads &mdash; click one to open it.</p>
+        <table class="stuck-table">
+          <thead><tr><th>Issue</th><th>Status</th><th>Owner</th><th>Since</th><th>Uploads</th><th>Days</th></tr></thead>
+          <tbody>
+            ${stuckItems.map(s => `
+              <tr data-id="${s.issue.id}">
+                <td>${s.issue.title}</td>
+                <td><span class="status-pill ${s.issue.status}">${STATUS_LABELS[s.issue.status] || s.issue.status}</span></td>
+                <td>${s.issue.owner || '&mdash;'}</td>
+                <td>${formatDate(s.sinceDate ? s.sinceDate.slice(0,10) : '')}</td>
+                <td>${s.streak}</td>
+                <td>${s.days}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    ` : `
+      <div class="analysis-card">
+        <div class="analysis-card-title">Stuck Items</div>
+        <div class="empty">No items have persisted in the same status across multiple uploads yet.</div>
+      </div>
+    `;
+
+    body.innerHTML = `
+      <div class="analysis-wrap">
+        <div class="analysis-header">Analysis <span class="count">(across ${chrono.length} uploads)</span></div>
+        <div class="analysis-chart-row">
+          <div class="analysis-card">
+            <div class="analysis-card-title">Walmart Blockers Over Time</div>
+            ${renderLineChartSVG([{ name: 'Walmart Blockers', color: '#a3402f', points: blockerPoints }], xLabels)}
+          </div>
+          ${newItemsHtml}
+          ${closuresHtml}
+          ${statusPieHtml}
+        </div>
+        ${dueDateHtml}
+        ${stuckHtml}
+      </div>
+    `;
+
+    body.querySelectorAll('.stuck-table tbody tr').forEach(tr => {
+      tr.addEventListener('click', () => openModal(tr.getAttribute('data-id')));
+    });
   }
 
   function render() {
     renderStats();
     renderHeaderSummary();
+    renderAsOfNav();
+    renderActiveFilters();
     const list = getFiltered();
     const body = document.getElementById('body');
     if (currentView === 'board') body.innerHTML = renderBoard(list);
     else if (currentView === 'table') body.innerHTML = renderTable(list);
     else if (currentView === 'calendar') body.innerHTML = renderCalendar(list);
-    else body.innerHTML = renderCompletedList(list);
+    else if (currentView === 'closed') body.innerHTML = renderClosedList(list);
+    else if (currentView === 'monitoring') body.innerHTML = renderMonitoringList(list);
+    else if (currentView === 'onhold') body.innerHTML = renderOnHoldList(list);
+    else if (currentView === 'fdd') {
+      body.innerHTML = '<div class="empty">Loading FDD documents&hellip;</div>';
+      loadAndRenderFddView(list);
+    }
+    else if (currentView === 'history') {
+      body.innerHTML = '<div class="empty">Loading history&hellip;</div>';
+      loadAndRenderHistory();
+    }
+    else if (currentView === 'analysis') {
+      body.innerHTML = '<div class="empty">Crunching upload history&hellip;</div>';
+      loadAndRenderAnalysis();
+    }
 
     body.querySelectorAll('[data-id]').forEach(el => {
-      el.addEventListener('click', () => openModal(el.getAttribute('data-id')));
+      el.addEventListener('click', (e) => {
+        if (e.target.closest('.fdd-row-controls')) return;
+        openModal(el.getAttribute('data-id'));
+      });
     });
 
     if (currentView === 'calendar') {
@@ -1254,6 +2968,471 @@
     backdrop.querySelector('#diagram-close').addEventListener('click', close);
   }
 
+  // ---------- Upload RAID Log (parses the source spreadsheet directly —
+  // .xlsx, .xls, or .csv — then transforms it into this tracker's issue
+  // format and records a historical snapshot of the result) ----------
+
+  function normalizeHeader(s) {
+    return (s || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
+  }
+
+  // Columns are found by their HEADER TEXT in the RAID log's header row,
+  // not by fixed position, so inserting, removing or moving a column in
+  // Excel no longer shifts what the tracker reads. (Fixed positions broke
+  // when a "Scoping date" column was added at K, which pushed Walmart
+  // blocker from M to N and made every blocker read as blank.)
+  // Each field lists the exact header names it accepts, compared
+  // case-insensitively with extra spaces ignored. If none of them are
+  // found, that field is left blank and the upload dialog lists it under
+  // "Not found", so a renamed header shows up instead of silently misreading.
+  const RAID_HEADER_NAMES = {
+    raidNumber: ['raid #', 'raid#', 'raid no.', 'raid no', 'raid'],
+    devops: ['devops', 'dev ops', 'devops #', 'dev ops #'],
+    status: ['deployment status', 'status'],
+    description: ['description'],
+    scopingDate: ['scoping date'],
+    targetDate: ['turnover to dg target date', 'target date'],
+    blocker: ['walmart blocker', 'walmart blockers'],
+    priority: ['priority'],
+    owner: ['owner'],
+  };
+
+  function detectColumnMap(headerRow) {
+    const headers = (headerRow || []).map(normalizeHeader);
+    const map = {};
+    Object.keys(RAID_HEADER_NAMES).forEach(field => {
+      for (const name of RAID_HEADER_NAMES[field]) {
+        const idx = headers.indexOf(name);
+        if (idx !== -1) { map[field] = idx; return; }
+      }
+    });
+    return map;
+  }
+
+  function mapRaidStatus(raw) {
+    const s = (raw || '').toString().trim().toLowerCase();
+    // Order matters: check the more specific/distinguishing phrases
+    // before shorter substrings that could otherwise match too broadly.
+    if (s.indexOf('closed') !== -1) return 'closed';
+    if (s.indexOf('ready for customer') !== -1) return 'readycustomer';
+    if (s.indexOf('ready for install') !== -1) return 'readyinstall';
+    if (s.indexOf('in progress') !== -1) return 'inprogress';
+    // Both "Testing" and "Testing (PSO)" land in the same bucket.
+    if (s.indexOf('testing') !== -1) return 'testing';
+    if (s.indexOf('monitoring') !== -1) return 'monitoring';
+    if (s.indexOf('on hold') !== -1 || s.indexOf('onhold') !== -1) return 'onhold';
+    return 'open';
+  }
+
+  // Same lesson as mapRaidStatus: match loosely (any case, trimmed,
+  // single-letter or full-word) rather than requiring an exact "Yes"/"No"
+  // — real exported values vary (e.g. "yes", "Y", trailing spaces) and an
+  // exact match silently miscounted many genuine blockers as non-blockers.
+  function mapRaidBlocker(raw) {
+    const b = (raw || '').toString().trim().toLowerCase();
+    if (b === 'y/n' || b === 'yes/no') return 'Y/N';
+    if (b === 'yes' || b === 'y' || b === 'true' || b === '1') return 'Y';
+    if (b === 'no' || b === 'n' || b === 'false' || b === '0') return 'N';
+    return '';
+  }
+
+  // Recognizes a handful of common non-ISO date formats seen in real
+  // exports/pastes (e.g. "4-Aug" from a text-formatted Excel cell, or
+  // "08/14/26" from a plain paste) and normalizes them to ISO YYYY-MM-DD,
+  // so isLate() and the Missing Due Date filter treat them as real dates
+  // instead of lumping them in with genuine placeholders like "TBD".
+  // Returns null if the text isn't a recognized date format at all.
+  function parseFlexibleDate(raw) {
+    const s = (raw || '').toString().trim();
+    if (!s) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+    const pad = n => String(n).padStart(2, '0');
+    const normalizeYear = (yy) => {
+      if (yy.length === 4) return parseInt(yy, 10);
+      const n = parseInt(yy, 10);
+      return n < 50 ? 2000 + n : 1900 + n;
+    };
+
+    // MM/DD/YY or MM/DD/YYYY
+    let m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
+    if (m) {
+      const [, mm, dd, yy] = m;
+      return `${normalizeYear(yy)}-${pad(mm)}-${pad(dd)}`;
+    }
+
+    const months = { jan:1, feb:2, mar:3, apr:4, may:5, jun:6, jul:7, aug:8, sep:9, oct:10, nov:11, dec:12 };
+
+    // D-MMM-YY(YY) e.g. "4-Aug-26"
+    m = s.match(/^(\d{1,2})-([A-Za-z]{3,})-(\d{2}|\d{4})$/);
+    if (m && months[m[2].toLowerCase().slice(0,3)]) {
+      const month = months[m[2].toLowerCase().slice(0,3)];
+      return `${normalizeYear(m[3])}-${pad(month)}-${pad(m[1])}`;
+    }
+
+    // D-MMM with no year e.g. "4-Aug" — assume the current year, since
+    // these are near-term project dates, not historical records.
+    m = s.match(/^(\d{1,2})-([A-Za-z]{3,})$/);
+    if (m && months[m[2].toLowerCase().slice(0,3)]) {
+      const month = months[m[2].toLowerCase().slice(0,3)];
+      return `${new Date().getFullYear()}-${pad(month)}-${pad(m[1])}`;
+    }
+
+    return null;
+  }
+
+  function excelCellToDateString(val) {
+    if (val instanceof Date && !isNaN(val)) {
+      const pad = n => String(n).padStart(2, '0');
+      return `${val.getFullYear()}-${pad(val.getMonth() + 1)}-${pad(val.getDate())}`;
+    }
+    const raw = (val || '').toString().trim();
+    const parsed = parseFlexibleDate(raw);
+    return parsed || raw;
+  }
+
+  // Every row that comes through here gets a monotonically-increasing
+  // sequence number for the CURRENT upload only — used purely to make
+  // each unmatched ("nodevops-") id unique within this one upload's
+  // array of issues; it carries no meaning across uploads.
+  let _raidRowSeq = 0;
+
+  function transformRaidRow(row, index) {
+    const raidNumber = (row.raidNumber || '').toString().trim();
+    const devops = (row.devops || '').toString().trim();
+    // Line breaks / repeated spaces inside the DevOps cell (e.g. "Parent
+    // 14185,<line break>24242") are collapsed for the id only, since an id
+    // containing a line break can't be matched back when the card is clicked.
+    const devopsKey = devops.replace(/\s+/g, ' ');
+    const noteParts = [];
+    if (row.notes) noteParts.push(row.notes);
+    if (row.latestComment) noteParts.push('Latest comment: ' + row.latestComment);
+    // Stable ID is based on DevOps # — it's assigned to the actual issue,
+    // not to a spreadsheet row, so it stays put even when rows get
+    // added/removed/resorted in Excel (unlike RAID #, which is really
+    // just a row position and broke History's diffing for exactly that
+    // reason). Rows with no DevOps # yet get a one-time-use id that will
+    // never match anything in another upload — diffSnapshotItems()
+    // recognizes that prefix and reports them as "unmatched" rather than
+    // silently counting them as new or removed every time.
+    // A DevOps value with no digits in it (e.g. "N/A - DG") isn't a real
+    // ticket number, so it's treated like a blank one for the id — otherwise
+    // every "N/A - DG" row would share one id and open the wrong card.
+    const id = hasRealDevops(devops) ? ('devops-' + devopsKey) : ('nodevops-' + (raidNumber || 'row') + '-' + (_raidRowSeq++));
+    return {
+      id: id,
+      raidNumber: raidNumber,
+      area: (row.type || 'General').toString().trim(),
+      title: (row.description || '').toString().trim() || 'Untitled item',
+      detail: (row.description || '').toString().trim(),
+      status: mapRaidStatus(row.status),
+      owner: (row.owner || '').toString().trim(),
+      devops: devops,
+      priority: (row.priority || '').toString().trim(),
+      blocker: mapRaidBlocker(row.blocker),
+      scopingDate: excelCellToDateString(row.scopingDate),
+      targetDate: excelCellToDateString(row.targetDate),
+      notes: noteParts.join('\n\n'),
+      reportedDate: '',
+    };
+  }
+
+  function hasRealDevops(devops) {
+    return /\d/.test(devops || '');
+  }
+
+  // Two rows sometimes carry the same DevOps # (a typo, or a copied row).
+  // Every card needs its own id, or clicking one opens the other. For each
+  // duplicated DevOps #, the first row that isn't Closed keeps the plain
+  // 'devops-<n>' id (so its History and FDD file stay attached) and the
+  // others get the RAID # appended, e.g. 'devops-17678-raid110'.
+  function makeIdsUnique(list) {
+    const groups = {};
+    list.forEach(it => { (groups[it.id] = groups[it.id] || []).push(it); });
+    Object.keys(groups).forEach(id => {
+      const g = groups[id];
+      if (g.length < 2) return;
+      const keeper = g.find(it => it.status !== 'closed') || g[0];
+      g.forEach(it => { if (it !== keeper) it.id = id + '-raid' + (it.raidNumber || 'row'); });
+    });
+    // Final safety net in case RAID #s repeat as well.
+    const seen = new Set();
+    list.forEach(it => {
+      let candidate = it.id, n = 2;
+      while (seen.has(candidate)) candidate = it.id + '-' + (n++);
+      it.id = candidate;
+      seen.add(candidate);
+    });
+    return list;
+  }
+
+  // For the upload dialog: lists each real DevOps # used on more than one
+  // row, with the RAID #s involved, so it can be corrected in the RAID log.
+  function findDuplicateDevops(objects) {
+    const byDevops = {};
+    objects.forEach(o => {
+      const d = (o.devops || '').toString().trim();
+      if (!hasRealDevops(d)) return;
+      (byDevops[d] = byDevops[d] || []).push((o.raidNumber || '?').toString().trim());
+    });
+    return Object.keys(byDevops).filter(d => byDevops[d].length > 1).map(d => ({ devops: d, raids: byDevops[d] }));
+  }
+
+  function isRaidHeaderCell(cell) {
+    const h = normalizeHeader(cell);
+    return h.indexOf('raid') === 0; // "RAID #", "RAID#", "RAID No.", etc.
+  }
+
+  // Turns a 2D array of raw cell values (however we got it — SheetJS,
+  // or a hand-parsed paste) into the intermediate row-object shape
+  // transformRaidRow() expects, skipping the header row and any blank
+  // separator rows (e.g. the "- Risks" section dividers in the source).
+  function rawRowsToRaidObjects(rows) {
+    // Find the header row: the one whose first cell starts with "RAID".
+    let headerIdx = rows.findIndex(r => isRaidHeaderCell(r[0]));
+    if (headerIdx === -1) headerIdx = 0; // fall back to assuming row 1 is the header
+
+    const cols = detectColumnMap(rows[headerIdx]);
+    const get = (r, field) => (cols[field] !== undefined ? r[cols[field]] : '');
+
+    const dataRows = rows.slice(headerIdx + 1);
+    const objects = [];
+    dataRows.forEach((r) => {
+      const raidNumber = (get(r, 'raidNumber') || '').toString().trim();
+      const description = (get(r, 'description') || '').toString().trim();
+      // Section-divider rows (marking the start of "Risks"/"Actions"/etc.
+      // groupings in the source sheet) always use a lone "-" in the RAID #
+      // column. Checking for that directly is more reliable than checking
+      // for a blank description — in some file layouts the divider's
+      // section label (e.g. "Risks") lands in the description column
+      // position, which would otherwise let it slip through as a real
+      // item with a blank status (defaulting to "Open").
+      if (raidNumber === '-') return;
+      if (!description) return; // blank/separator row
+      objects.push({
+        raidNumber,
+        devops: get(r, 'devops'),
+        internalExternal: get(r, 'internalExternal'),
+        type: get(r, 'type'),
+        status: get(r, 'status'),
+        blocker: get(r, 'blocker'),
+        description,
+        scopingDate: get(r, 'scopingDate'),
+        targetDate: get(r, 'targetDate'),
+        owner: get(r, 'owner'),
+        priority: get(r, 'priority'),
+        notes: get(r, 'notes'),
+        latestComment: get(r, 'latestComment'),
+      });
+    });
+    return objects;
+  }
+
+  // Parses an uploaded .xlsx/.xls/.csv file (as an ArrayBuffer) via
+  // SheetJS, picks the sheet that actually looks like the RAID log (the
+  // one containing a "RAID #"-style header — the workbook also has a
+  // summary sheet and a validation-list sheet we want to ignore), and
+  // returns the intermediate row-object array.
+  function parseSpreadsheetFile(arrayBuffer) {
+    const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: true });
+    for (const sheetName of workbook.SheetNames) {
+      const sheet = workbook.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: '' });
+      const headerIdx = rows.findIndex(r => isRaidHeaderCell(r[0]));
+      if (headerIdx !== -1) {
+        const columnMap = detectColumnMap(rows[headerIdx]);
+        return { objects: rawRowsToRaidObjects(rows), sheetName, columnMap };
+      }
+    }
+    return { objects: [], sheetName: null, columnMap: {} };
+  }
+
+  // Only the fields the tracker actually reads are listed here, so the
+  // upload dialog's "Not found" line only flags a real problem.
+  const RAID_FIELD_LABELS = {
+    raidNumber: 'RAID #', devops: 'DevOps', status: 'Deployment Status', description: 'Description',
+    scopingDate: 'Scoping date', targetDate: 'Turnover to DG Target Date', blocker: 'Walmart Blocker', priority: 'Priority', owner: 'Owner',
+  };
+
+  function describeColumnMap(columnMap) {
+    const letter = (i) => {
+      let s = '';
+      i = i + 1;
+      while (i > 0) { const r = (i - 1) % 26; s = String.fromCharCode(65 + r) + s; i = Math.floor((i - 1) / 26); }
+      return s;
+    };
+    const found = Object.keys(RAID_FIELD_LABELS).filter(f => columnMap[f] !== undefined).map(f => `${RAID_FIELD_LABELS[f]} (${letter(columnMap[f])})`);
+    const missing = Object.keys(RAID_FIELD_LABELS).filter(f => columnMap[f] === undefined).map(f => RAID_FIELD_LABELS[f]);
+    let text = 'Columns found: ' + (found.join(', ') || 'none');
+    if (missing.length) text += '. <strong style="color:var(--rust);">Not found: ' + missing.join(', ') + '</strong> — check that the header text in the RAID log matches.';
+    return text;
+  }
+
+  // Parses text pasted directly from Excel (selecting a range of cells
+  // and copying puts tab-separated values on the clipboard).
+  function parsePastedRows(text) {
+    const lines = text.split(/\r?\n/).filter(l => l.length > 0);
+    const rows = lines.map(l => l.split('\t'));
+    return rawRowsToRaidObjects(rows);
+  }
+
+  function openUploadRaidModal() {
+    let pendingObjects = null; // set once a file has been successfully parsed
+
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.innerHTML = `
+      <div class="modal" style="max-width:600px;">
+        <h2>Upload RAID Log</h2>
+        <p style="font-size:13px;line-height:1.5;color:var(--ink-soft);margin:0 0 10px;">
+          Choose the RAID log spreadsheet directly (.xlsx, .xls, or .csv) — no need to convert
+          anything first.
+        </p>
+        <div class="field">
+          <label>Snapshot date — when was this RAID log exported/current as of?</label>
+          <input type="date" id="raid-modal-date" value="${todayISO()}">
+          <p style="font-size:12px;color:var(--ink-soft);margin:6px 0 0;">
+            Today's date: replaces your current tracker data and records this upload in History.
+            A past date: adds a historical record to History only — your current tracker data
+            stays as-is.
+          </p>
+        </div>
+        <div class="field">
+          <label>Choose file</label>
+          <input type="file" id="raid-modal-file" accept=".xlsx,.xls,.csv">
+          <p id="raid-modal-file-status" style="font-size:12px;color:var(--ink-soft);margin:6px 0 0;"></p>
+        </div>
+        <div class="field">
+          <label>Or paste copied rows from Excel here (select the rows, Ctrl+C, paste below)</label>
+          <textarea id="raid-modal-textarea" placeholder="Paste copied Excel rows here..." style="width:100%;height:140px;font-family:monospace;font-size:11.5px;padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--paper);resize:vertical;"></textarea>
+        </div>
+        <p id="raid-modal-error" style="font-size:12.5px;color:var(--rust);margin:0 0 8px;display:none;"></p>
+        <div class="modal-actions" style="justify-content:flex-end;gap:8px;">
+          <button class="btn-secondary" id="raid-cancel">Cancel</button>
+          <button class="btn-primary" id="raid-load">Upload</button>
+        </div>
+      </div>
+    `;
+    ROOT.appendChild(backdrop);
+    const close = () => backdrop.remove();
+    backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(); });
+    backdrop.querySelector('#raid-cancel').addEventListener('click', close);
+
+    const fileInput = backdrop.querySelector('#raid-modal-file');
+    const textarea = backdrop.querySelector('#raid-modal-textarea');
+    const dateInput = backdrop.querySelector('#raid-modal-date');
+    const errorEl = backdrop.querySelector('#raid-modal-error');
+    const fileStatusEl = backdrop.querySelector('#raid-modal-file-status');
+
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files[0];
+      if (!file) return;
+      errorEl.style.display = 'none';
+      fileStatusEl.textContent = 'Reading file…';
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const { objects, sheetName, columnMap } = parseSpreadsheetFile(reader.result);
+          if (!objects.length) {
+            pendingObjects = null;
+            fileStatusEl.textContent = '';
+            errorEl.textContent = 'Could not find a "RAID #" column in any sheet of this file. Make sure this is the RAID log spreadsheet.';
+            errorEl.style.display = 'block';
+            return;
+          }
+          pendingObjects = objects;
+          const dups = findDuplicateDevops(objects);
+          const dupHtml = dups.length ? `<br><strong style="color:var(--amber);">Same DevOps # on more than one row:</strong> ${dups.map(d => `${d.devops} (RAID # ${d.raids.join(', ')})`).join('; ')}. Each still gets its own card, but you may want to correct the RAID log.` : '';
+          fileStatusEl.innerHTML = `Found ${objects.length} row(s) in sheet "${sheetName}". Click Upload to continue.<br><span style="opacity:0.8;">${describeColumnMap(columnMap)}</span>${dupHtml}`;
+        } catch (e) {
+          pendingObjects = null;
+          fileStatusEl.textContent = '';
+          errorEl.textContent = 'Could not read that file as a spreadsheet — try a .xlsx, .xls, or .csv export, or use the paste option below.';
+          errorEl.style.display = 'block';
+        }
+      };
+      reader.onerror = () => {
+        pendingObjects = null;
+        fileStatusEl.textContent = '';
+        errorEl.textContent = 'Could not read that file — try pasting rows into the box below instead.';
+        errorEl.style.display = 'block';
+      };
+      reader.readAsArrayBuffer(file);
+    });
+
+    backdrop.querySelector('#raid-load').addEventListener('click', () => {
+      let objects = pendingObjects;
+      if (!objects) {
+        const pasted = textarea.value.trim();
+        if (!pasted) {
+          errorEl.textContent = 'Choose a file above, or paste copied rows into the box before uploading.';
+          errorEl.style.display = 'block';
+          return;
+        }
+        objects = parsePastedRows(pasted);
+        if (!objects.length) {
+          errorEl.textContent = 'Could not find any RAID log rows in the pasted text.';
+          errorEl.style.display = 'block';
+          return;
+        }
+      }
+      const snapshotDate = dateInput.value || todayISO();
+      const isHistorical = snapshotDate !== todayISO();
+      _raidRowSeq = 0;
+      const transformed = makeIdsUnique(objects.map((row, i) => transformRaidRow(row, i)));
+      close();
+
+      const confirmMessage = isHistorical
+        ? `Record this as a historical RAID log snapshot dated ${formatDate(snapshotDate)}? This adds ${transformed.length} item(s) to History only — it will NOT change your current tracker data.`
+        : `Upload ${transformed.length} item(s) from this RAID log? This will replace all ${issues.length} item(s) currently in the tracker.`;
+
+      showConfirmModal(
+        confirmMessage,
+        async () => {
+          // Live uploads use the real current moment (full timestamp
+          // precision) so multiple uploads on the same calendar day still
+          // sort in the order they actually happened — using a fixed
+          // noon-of-that-date timestamp for every live upload would make
+          // same-day uploads indistinguishable and their History order
+          // effectively random. Historical (backdated) uploads don't have
+          // a real time to anchor to, so noon-of-that-date is the
+          // reasonable choice there.
+          const snapshotIso = isHistorical ? new Date(snapshotDate + 'T12:00:00').toISOString() : new Date().toISOString();
+          if (isHistorical) {
+            // History-only: don't touch the live tracker data.
+            await saveSnapshot(transformed, snapshotIso);
+            if (currentView === 'history') loadAndRenderHistory();
+          } else {
+            // Keep each item's tracker-edit history across the replace,
+            // matched on the same DevOps-based id the History tab uses.
+            const priorLogs = new Map(issues
+              .filter(i => isTrackableId(i.id) && Array.isArray(i.editLog) && i.editLog.length)
+              .map(i => [i.id, i.editLog]));
+            transformed.forEach(t => { if (priorLogs.has(t.id)) t.editLog = priorLogs.get(t.id); });
+            issues = transformed;
+            await saveIssues(snapshotDate);
+            await saveSnapshot(issues, snapshotIso);
+            populateFilters();
+            render();
+          }
+        },
+        'Upload'
+      );
+    });
+  }
+
+  async function saveSnapshot(issuesToSnapshot, uploadedAt) {
+    try {
+      await fetch('/api/snapshots', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ issues: issuesToSnapshot, uploadedAt }),
+      });
+    } catch (e) {
+      console.error('Snapshot save failed', e);
+    }
+  }
+
   function parseAndValidateImport(text) {
     let parsed;
     try {
@@ -1339,12 +3518,13 @@
           await saveIssues();
           populateFilters();
           render();
-        }
+        },
+        'Import'
       );
     });
   }
 
-  function showConfirmModal(message, onConfirm) {
+  function showConfirmModal(message, onConfirm, confirmLabel) {
     const backdrop = document.createElement('div');
     backdrop.className = 'modal-backdrop';
     backdrop.innerHTML = `
@@ -1353,7 +3533,7 @@
         <p style="font-size:13.5px;line-height:1.5;color:var(--ink-soft);margin:0 0 18px;">${message}</p>
         <div class="modal-actions" style="justify-content:flex-end;gap:8px;">
           <button class="btn-secondary" id="confirm-cancel">Cancel</button>
-          <button class="btn-primary" id="confirm-ok">Import</button>
+          <button class="btn-primary" id="confirm-ok">${confirmLabel || 'OK'}</button>
         </div>
       </div>
     `;
@@ -1373,8 +3553,18 @@
     return STATUS_LABELS[status] || status;
   }
 
-  function buildCopyText() {
+  // Single-status tabs (Monitoring, On Hold, Closed) copy only the items
+  // shown on that tab; every other view copies the full filtered list.
+  function getCopyList() {
     const list = getFiltered();
+    if (currentView === 'closed' || currentView === 'monitoring' || currentView === 'onhold') {
+      return list.filter(i => i.status === currentView);
+    }
+    return list;
+  }
+
+  function buildCopyText() {
+    const list = getCopyList();
     const header = `TIFTON GO-LIVE TRACKER\nGenerated ${todayLabel()}\n${list.length} issue(s)\n`;
 
     if (!list.length) return header + '\nNo issues match the current filters.';
@@ -1384,14 +3574,18 @@
         const statusDiff = STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status);
         return statusDiff !== 0 ? statusDiff : a.title.localeCompare(b.title);
       }).map(i => {
-        return [i.area, i.title, i.detail, i.devops || '\u2014', i.priority || '\u2014', i.blocker || '\u2014', i.reportedDate ? formatDate(i.reportedDate) : '\u2014', i.targetDate ? formatDate(i.targetDate) : '\u2014', i.notes || '\u2014', i.owner || '\u2014', statusText(i.status)].join('\t');
+        return [i.title, i.detail, i.devops || '\u2014', i.priority || '\u2014', i.blocker || '\u2014', i.reportedDate ? formatDate(i.reportedDate) : '\u2014', i.scopingDate ? formatDate(i.scopingDate) : '\u2014', i.targetDate ? formatDate(i.targetDate) : '\u2014', i.notes || '\u2014', i.owner || '\u2014', statusText(i.status)].join('\t');
       });
-      const cols = ['Area', 'Title', 'Detail', 'DevOps #', 'Priority', 'Walmart Blocker', 'Reported', 'Target', 'Notes', 'Owner', 'Status'].join('\t');
+      const cols = ['Title', 'Detail', 'DevOps #', 'Priority', 'Walmart Blocker', 'Reported', 'Scoping', 'Target (UAT)', 'Notes', 'Owner', 'Status'].join('\t');
       return header + '\n' + cols + '\n' + rows.join('\n');
     }
 
-    // board view (grouped by status)
-    const blocks = STATUS_ORDER.map(st => {
+    // Board view groups by only the 5 Board statuses (matching what's on
+    // screen); other views that fall through here (Closed, Calendar,
+    // History) still group by the full status list so their own items
+    // (e.g. Closed) aren't silently dropped.
+    const groupOrder = currentView === 'board' ? BOARD_STATUS_ORDER : STATUS_ORDER;
+    const blocks = groupOrder.map(st => {
       const items = list.filter(i => i.status === st);
       if (!items.length) return null;
       const lines = items.map(i => formatIssueLine(i));
@@ -1401,14 +3595,15 @@
   }
 
   function formatIssueLine(i) {
+    const devopsPrefix = i.devops ? `DevOps #${i.devops} — ` : '';
     const owner = i.owner ? `  |  ${i.owner}` : '';
-    const devops = i.devops ? `  |  DevOps #${i.devops}` : '';
     const priority = i.priority ? `  |  ${i.priority} priority` : '';
     const blocker = isBlocker(i.blocker) ? `  |  WALMART BLOCKER${i.blocker === 'Y/N' ? ' (Y/N)' : ''}` : '';
     const reported = i.reportedDate ? `  |  Reported: ${formatDate(i.reportedDate)}` : '';
-    const target = i.targetDate ? `  |  Target: ${formatDate(i.targetDate)}` : '';
+    const scoping = `  |  Scoping: ${formatDateOrTbd(i.scopingDate)}${isScopingLate(i) ? ' (OVERDUE)' : ''}`;
+    const target = `  |  Target (UAT): ${formatDateOrTbd(i.targetDate)}${isLate(i) ? ' (LATE)' : ''}`;
     const notes = i.notes ? `\nNotes: ${i.notes}` : '';
-    return `[${i.area}]${devops} ${i.title}\n${i.detail}${owner}${priority}${blocker}${reported}${target}${notes}`;
+    return `${devopsPrefix}${i.title}\n${i.detail}${owner}${priority}${blocker}${reported}${scoping}${target}${notes}`;
   }
 
   // Colors mirrored from the app's CSS variables, hardcoded here since inline
@@ -1421,8 +3616,10 @@
     moss: '#4a6b4d', mossBg: '#e7efe4',
     slate: '#6b7280', slateBg: '#eceae2',
     teal: '#1f7a72', tealBg: '#daf0ee',
+    plum: '#6b4fa0', plumBg: '#f2ecfb',
+    forest: '#2f6b3a', forestBg: '#e2f0e4',
   };
-  const STATUS_EMAIL_COLOR = { open: 'rust', inprogress: 'amber', testing: 'steel', readyinstall: 'slate', readycustomer: 'moss', completed: 'teal' };
+  const STATUS_EMAIL_COLOR = { open: 'rust', inprogress: 'amber', testing: 'steel', readycustomer: 'moss', readyinstall: 'slate', monitoring: 'plum', onhold: 'forest', closed: 'teal' };
 
   function esc(s) {
     return String(s == null ? '' : s)
@@ -1451,12 +3648,13 @@
     if (i.priority) { const pc = priorityEmailColor(i.priority); if (pc) chips.push(chip(i.priority + ' priority', pc)); }
     if (isBlocker(i.blocker)) chips.push(chip('WALMART BLOCKER' + (i.blocker === 'Y/N' ? ' (Y/N)' : ''), 'rust'));
     if (i.reportedDate) chips.push(chip('Reported: ' + formatDate(i.reportedDate), 'slate'));
-    if (i.targetDate) chips.push(chip('Target: ' + formatDate(i.targetDate), 'slate'));
+    chips.push(chip('Scoping: ' + formatDateOrTbd(i.scopingDate) + (isScopingLate(i) ? ' (OVERDUE)' : ''), 'plum'));
+    chips.push(chip('Target (UAT): ' + formatDateOrTbd(i.targetDate) + (isLate(i) ? ' (LATE)' : ''), isLate(i) ? 'rust' : 'slate'));
     return chips.join('');
   }
 
   function buildCopyHtml() {
-    const list = getFiltered();
+    const list = getCopyList();
     const font = "font-family:Arial,Helvetica,sans-serif;";
     const headerHtml = `
       <div style="${font}margin-bottom:14px;">
@@ -1474,23 +3672,24 @@
         return statusDiff !== 0 ? statusDiff : a.title.localeCompare(b.title);
       });
       const th = (label) => `<th style="text-align:left;padding:6px 10px;border-bottom:2px solid ${EMAIL_COLORS.ink};font-size:11px;text-transform:uppercase;letter-spacing:0.03em;color:${EMAIL_COLORS.inkSoft};">${esc(label)}</th>`;
+      const td = `padding:8px 10px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;font-size:12.5px;`;
       const rowsHtml = sorted.map(i => {
         const statusColor = EMAIL_COLORS[STATUS_EMAIL_COLOR[i.status]];
         const statusBg = EMAIL_COLORS[STATUS_EMAIL_COLOR[i.status] + 'Bg'];
         return `
           <tr>
-            <td style="padding:8px 10px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;font-size:12.5px;">${esc(i.area)}</td>
             <td style="padding:8px 10px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;">
               <div style="font-weight:700;font-size:13px;color:${EMAIL_COLORS.ink};">${esc(i.title)}</div>
               <div style="font-size:12px;color:${EMAIL_COLORS.inkSoft};margin-top:2px;">${escNl(i.detail)}</div>
               ${i.notes ? `<div style="font-size:11.5px;color:${EMAIL_COLORS.steel};font-style:italic;margin-top:4px;"><strong>Notes:</strong> ${escNl(i.notes)}</div>` : ''}
             </td>
-            <td style="padding:8px 10px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;font-size:12.5px;">${esc(i.devops) || '&mdash;'}</td>
-            <td style="padding:8px 10px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;font-size:12.5px;">${esc(i.priority) || '&mdash;'}</td>
-            <td style="padding:8px 10px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;font-size:12.5px;${isBlocker(i.blocker) ? `color:${EMAIL_COLORS.rust};font-weight:700;` : ''}">${isBlocker(i.blocker) ? 'YES' + (i.blocker === 'Y/N' ? ' (Y/N)' : '') : (esc(i.blocker) || '&mdash;')}</td>
-            <td style="padding:8px 10px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;font-size:12.5px;">${i.reportedDate ? esc(formatDate(i.reportedDate)) : '&mdash;'}</td>
-            <td style="padding:8px 10px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;font-size:12.5px;">${i.targetDate ? esc(formatDate(i.targetDate)) : '&mdash;'}</td>
-            <td style="padding:8px 10px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;font-size:12.5px;">${esc(i.owner) || '&mdash;'}</td>
+            <td style="${td}">${esc(i.devops) || '&mdash;'}</td>
+            <td style="${td}">${esc(i.priority) || '&mdash;'}</td>
+            <td style="${td}${isBlocker(i.blocker) ? `color:${EMAIL_COLORS.rust};font-weight:700;` : ''}">${isBlocker(i.blocker) ? 'YES' + (i.blocker === 'Y/N' ? ' (Y/N)' : '') : (esc(i.blocker) || '&mdash;')}</td>
+            <td style="${td}">${i.reportedDate ? esc(formatDate(i.reportedDate)) : '&mdash;'}</td>
+            <td style="${td}${isScopingLate(i) ? `color:${EMAIL_COLORS.plum};font-weight:700;` : ''}">${i.scopingDate ? esc(formatDate(i.scopingDate)) : '&mdash;'}</td>
+            <td style="${td}${isLate(i) ? `color:${EMAIL_COLORS.rust};font-weight:700;` : ''}">${i.targetDate ? esc(formatDate(i.targetDate)) : '&mdash;'}</td>
+            <td style="${td}">${esc(i.owner) || '&mdash;'}</td>
             <td style="padding:8px 10px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;">
               <span style="display:inline-block;font-size:11px;font-weight:700;color:${statusColor};background:${statusBg};border-radius:100px;padding:3px 10px;white-space:nowrap;">${esc(STATUS_LABELS[i.status])}</span>
             </td>
@@ -1500,20 +3699,22 @@
         <div style="${font}">
           ${headerHtml}
           <table style="border-collapse:collapse;width:100%;">
-            <thead><tr>${th('Area')}${th('Issue')}${th('DevOps #')}${th('Priority')}${th('Walmart Blocker')}${th('Reported')}${th('Target')}${th('Owner')}${th('Status')}</tr></thead>
+            <thead><tr>${th('Issue')}${th('DevOps #')}${th('Priority')}${th('Walmart Blocker')}${th('Reported')}${th('Scoping')}${th('Target (UAT)')}${th('Owner')}${th('Status')}</tr></thead>
             <tbody>${rowsHtml}</tbody>
           </table>
         </div>`;
     }
 
-    // board view (grouped by status) -> a labeled table per status group
-    const sections = STATUS_ORDER.map(st => {
+    // Board view groups by only the 5 Board statuses (matching what's on
+    // screen); other views that fall through here still group by the
+    // full status list so their own items aren't silently dropped.
+    const groupOrder = currentView === 'board' ? BOARD_STATUS_ORDER : STATUS_ORDER;
+    const sections = groupOrder.map(st => {
       const items = list.filter(i => i.status === st);
       if (!items.length) return '';
       const color = EMAIL_COLORS[STATUS_EMAIL_COLOR[st]];
       const rowsHtml = items.map(i => `
         <tr>
-          <td style="padding:10px 12px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;width:120px;font-size:12.5px;color:${EMAIL_COLORS.inkSoft};">${esc(i.area)}</td>
           <td style="padding:10px 12px;border-bottom:1px solid ${EMAIL_COLORS.line};vertical-align:top;">
             <div style="font-weight:700;font-size:13.5px;color:${EMAIL_COLORS.ink};">${esc(i.title)}</div>
             <div style="margin:4px 0;">${issueMetaHtml(i)}</div>
@@ -1620,16 +3821,17 @@
 
   function openModal(id) {
     editingId = id || null;
-    const issue = id ? issues.find(i => i.id === id) : { area:'', title:'', detail:'', status: STATUS_ORDER[0], owner:'', devops:'', priority:'', blocker:'', targetDate:'', notes:'', reportedDate: todayISO() };
+    const issue = id ? issues.find(i => i.id === id) : { title:'', detail:'', status: STATUS_ORDER[0], owner:'', devops:'', priority:'', blocker:'', scopingDate:'', targetDate:'', notes:'', reportedDate: todayISO() };
     const backdrop = document.createElement('div');
     backdrop.className = 'modal-backdrop';
     backdrop.innerHTML = `
       <div class="modal">
-        <h2>${id ? 'Edit issue' : 'Add issue'}</h2>
-        <div class="field-row">
-          <div class="field"><label>Area</label><input type="text" id="m-area" value="${issue.area}" placeholder="e.g. Exotec, Packing"></div>
-          <div class="field"><label>Owner</label><input type="text" id="m-owner" value="${issue.owner||''}" placeholder="optional"></div>
+        <div class="modal-head">
+          <h2>${id ? 'Edit issue' : 'Add issue'}</h2>
+          ${id ? '<button type="button" class="btn-history" id="m-history-btn">View history</button>' : ''}
         </div>
+        ${id ? '<div class="issue-history" id="m-history" style="display:none;"></div>' : ''}
+        <div class="field"><label>Owner</label><input type="text" id="m-owner" value="${issue.owner||''}" placeholder="optional"></div>
         <div class="field"><label>Title</label><input type="text" id="m-title" value="${issue.title}" placeholder="Short summary"></div>
         <div class="field"><label>Detail</label><textarea id="m-detail" placeholder="Full description">${issue.detail}</textarea></div>
         <div class="field-row">
@@ -1644,9 +3846,10 @@
             </select>
           </div>
         </div>
+        <div class="field"><label>Reported date</label><input type="date" id="m-reported" value="${issue.reportedDate||''}"></div>
         <div class="field-row">
-          <div class="field"><label>Reported date</label><input type="date" id="m-reported" value="${issue.reportedDate||''}"></div>
-          <div class="field"><label>Target completion date</label><input type="date" id="m-target" value="${issue.targetDate||''}"></div>
+          <div class="field"><label>Scoping date (Hy-Tek)</label><input type="date" id="m-scoping" value="${isIsoDate(issue.scopingDate) ? issue.scopingDate : ''}"></div>
+          <div class="field"><label>Target (UAT) date</label><input type="date" id="m-target" value="${issue.targetDate||''}"></div>
         </div>
         <div class="field">
           <label>Walmart blocker</label>
@@ -1678,6 +3881,15 @@
     backdrop.addEventListener('click', (e) => { if (e.target === backdrop) backdrop.remove(); });
     document.getElementById('m-cancel').addEventListener('click', () => backdrop.remove());
     if (id) {
+      const historyBtn = document.getElementById('m-history-btn');
+      const historyBox = document.getElementById('m-history');
+      historyBtn.addEventListener('click', () => {
+        const opening = historyBox.style.display === 'none';
+        historyBox.style.display = opening ? '' : 'none';
+        historyBtn.textContent = opening ? 'Hide history' : 'View history';
+        historyBtn.classList.toggle('active', opening);
+        if (opening) showIssueHistory(historyBox, issue);
+      });
       document.getElementById('m-delete').addEventListener('click', async () => {
         issues = issues.filter(i => i.id !== id);
         await saveIssues();
@@ -1687,8 +3899,8 @@
       });
     }
     document.getElementById('m-save').addEventListener('click', async () => {
+      const scopingInput = document.getElementById('m-scoping').value;
       const data = {
-        area: document.getElementById('m-area').value.trim() || 'General',
         title: document.getElementById('m-title').value.trim(),
         detail: document.getElementById('m-detail').value.trim(),
         status: document.getElementById('m-status').value,
@@ -1697,13 +3909,19 @@
         priority: document.getElementById('m-priority').value,
         blocker: document.getElementById('m-blocker').value,
         reportedDate: document.getElementById('m-reported').value,
+        // Keep a text placeholder from the RAID log (e.g. "TBD") if the
+        // date picker was left empty, rather than silently wiping it.
+        scopingDate: scopingInput || (isIsoDate(issue.scopingDate) ? '' : (issue.scopingDate || '')),
         targetDate: document.getElementById('m-target').value,
         notes: document.getElementById('m-notes').value.trim(),
       };
       if (!data.title) { document.getElementById('m-title').focus(); return; }
       if (id) {
         const idx = issues.findIndex(i => i.id === id);
-        issues[idx] = { ...issues[idx], ...data };
+        const changes = diffHistoryFields(pickHistoryFields(issues[idx]), pickHistoryFields({ ...issues[idx], ...data }));
+        const editLog = Array.isArray(issues[idx].editLog) ? issues[idx].editLog.slice() : [];
+        if (changes.length) editLog.push({ at: new Date().toISOString(), changes });
+        issues[idx] = { ...issues[idx], ...data, editLog: editLog.slice(-EDIT_LOG_MAX) };
       } else {
         data.id = 'issue-' + Date.now();
         issues.push(data);
@@ -1716,12 +3934,11 @@
   }
 
   // Event bindings
-  document.getElementById('btn-add').addEventListener('click', () => openModal(null));
   document.getElementById('btn-copy-view').addEventListener('click', copyCurrentView);
   document.getElementById('btn-export').addEventListener('click', exportData);
   document.getElementById('btn-network-diagram').addEventListener('click', openNetworkDiagramModal);
   document.getElementById('btn-import').addEventListener('click', openImportModal);
-  document.getElementById('filter-area').addEventListener('change', render);
+  document.getElementById('btn-upload-raid').addEventListener('click', openUploadRaidModal);
   document.getElementById('filter-status').addEventListener('change', render);
   document.getElementById('filter-blocker').addEventListener('change', render);
   document.getElementById('filter-missing').addEventListener('change', render);
