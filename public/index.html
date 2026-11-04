@@ -259,10 +259,16 @@
   }
   #tifton-tracker .btn-copy:hover { background: var(--ink); color: var(--paper); }
   #tifton-tracker .btn-copy.copied { background: var(--moss); border-color: var(--moss); color: white; }
-  #tifton-tracker .btn-copy-header {
+  #tifton-tracker .head-actions {
     position: absolute;
     top: 16px;
     right: 24px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  #tifton-tracker .btn-copy-header {
     font-family: inherit;
     font-size: 11px;
     font-weight: 600;
@@ -294,8 +300,10 @@
     border-radius: 6px;
     background: transparent;
     color: rgba(243,241,234,0.85);
+    white-space: nowrap;
     cursor: pointer;
   }
+  #tifton-tracker .head-actions .btn-io { font-size: 11px; padding: 5px 10px; }
   #tifton-tracker .btn-io:hover { background: rgba(243,241,234,0.12); border-color: rgba(243,241,234,0.8); color: #f3f1ea; }
   #tifton-tracker .logout-row { text-align: center; padding: 0 24px 16px; }
   #tifton-tracker .logout-link { font-size: 11.5px; color: rgba(243,241,234,0.55); text-decoration: none; }
@@ -953,6 +961,7 @@
 
   @media (max-width: 480px) {
     #tifton-tracker .head { flex-direction: column; align-items: flex-start; }
+    #tifton-tracker .head-actions { position: static; justify-content: flex-start; }
   }
 </style>
 </head>
@@ -967,7 +976,12 @@
       </div>
     </div>
     <div class="stat-row" id="stat-row"></div>
-    <button class="btn-copy-header" id="btn-copy-view">Copy view</button>
+    <div class="head-actions">
+      <button class="btn-io" id="btn-upload-raid">Upload RAID Log</button>
+      <button class="btn-io" id="btn-export">Export JSON</button>
+      <button class="btn-io" id="btn-import">Import JSON</button>
+      <button class="btn-copy-header" id="btn-copy-view">Copy view</button>
+    </div>
   </div>
 
   <div class="nav-row">
@@ -1014,11 +1028,6 @@
     <div class="board-scrollbar-proxy-inner" id="board-scrollbar-proxy-inner"></div>
   </div>
   <div class="save-note" id="save-note">Loading&hellip;</div>
-  <div class="data-io">
-    <button class="btn-io" id="btn-upload-raid">Upload RAID Log</button>
-    <button class="btn-io" id="btn-export">Export JSON</button>
-    <button class="btn-io" id="btn-import">Import JSON</button>
-  </div>
   <div class="logout-row"><a href="/logout" class="logout-link">Log out</a></div>
   <button type="button" class="network-fab" id="btn-network-diagram">Network diagram</button>
 </div>
